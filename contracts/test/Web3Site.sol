@@ -4,9 +4,9 @@ pragma solidity ^0.8.20;
 import "../WTTPSite.sol";
 
 /// @title WTTP 'Web3Site' Implementation Contract
-/// @notice Concrete implementation of the WTTPSiteV3 abstract contract
+/// @notice Concrete implementation of the WTTPSite abstract contract
 /// @dev Provides a deployable implementation of the WTTP site
-contract Web3Site is WTTPSiteV3 {
+contract Web3Site is WTTPSite {
 
     /// @notice Initializes the site contract with necessary dependencies
     /// @dev Sets up DPR and default header, then passes to parent constructor
@@ -17,5 +17,5 @@ contract Web3Site is WTTPSiteV3 {
         address _dpr, 
         HeaderInfo memory _defaultHeader,
         address _owner
-    ) WTTPSiteV3(_dpr, _defaultHeader, _owner) {}
+    ) WTTPSite(_dpr, _defaultHeader, _owner) {}
 }

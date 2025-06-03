@@ -8,7 +8,7 @@ import "@tw3/esp/contracts/interfaces/IDataPointRegistry.sol";
 /// @notice Manages web resource storage and access control
 /// @dev Core storage functionality for the WTTP protocol, inheriting permission management
 ///      Resources are stored as chunks of data points with associated metadata and headers
-abstract contract WTTPStorageV3 is WTTPPermissionsV3 {
+abstract contract WTTPStorage is WTTPPermissions {
 
     /// @notice Initializes the storage contract with core dependencies and defaults
     /// @dev Sets up the data point registry and default header
@@ -19,7 +19,7 @@ abstract contract WTTPStorageV3 is WTTPPermissionsV3 {
         address _owner,
         address _dpr, 
         HeaderInfo memory _defaultHeader
-    ) WTTPPermissionsV3(_owner) {
+    ) WTTPPermissions(_owner) {
         DPR_ = IDataPointRegistry(_dpr);
         header[bytes32(0)] = _defaultHeader;
     }

@@ -2,12 +2,11 @@
 pragma solidity ^0.8.20;
 
 import "./WTTPStorage.sol";
-import "./WTTPPermissions.sol";
 /// @title WTTP Site Contract
 /// @notice Implements core WTTP protocol methods for HTTP-like operations on blockchain
-/// @dev Extends WTTPStorageV3 to provide web-like interactions with blockchain resources
+/// @dev Extends WTTPStorage to provide web-like interactions with blockchain resources
 ///      Implements methods similar to HTTP verbs (GET, PUT, DELETE, etc.)
-abstract contract WTTPSiteV3 is WTTPStorageV3 {
+abstract contract WTTPSite is WTTPStorage {
 
     /// @notice Initializes the site contract with necessary dependencies
     /// @dev Sets up DPR and default header, then passes to parent constructor
@@ -18,7 +17,7 @@ abstract contract WTTPSiteV3 is WTTPStorageV3 {
         address _dpr, 
         HeaderInfo memory _defaultHeader,
         address _owner
-    ) WTTPStorageV3(_owner, _dpr, _defaultHeader) {}
+    ) WTTPStorage(_owner, _dpr, _defaultHeader) {}
 
     /// @notice Retrieves the resource admin role for a specific path
     /// @dev Reads from the resource's header to get admin role identifier

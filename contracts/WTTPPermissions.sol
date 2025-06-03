@@ -2,12 +2,12 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@tw3/wttp-core/contracts/interfaces/WTTPTypes.sol";
+import "@wttp/core/contracts/interfaces/WTTPTypes.sol";
 
 /// @title WTTP Permissions Contract
 /// @notice Manages role-based access control for the WTTP protocol
 /// @dev Extends OpenZeppelin's AccessControl with site-specific roles and custom permission logic
-abstract contract WTTPPermissionsV3 is AccessControl {
+abstract contract WTTPPermissions is AccessControl {
 
     /// @notice Role identifier for site administrators
     /// @dev Calculated via keccak256 during construction. Site admins have elevated privileges but below the DEFAULT_ADMIN_ROLE
