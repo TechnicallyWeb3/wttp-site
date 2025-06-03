@@ -1,0 +1,36 @@
+{
+  "name": "wttp-site",
+  "version": "0.0.1",
+  "description": "WTTP Website or \"Web3Site\" contracts to enable HTTP like communication using the blockchain.",
+  "main": "index.js",
+  "scripts": {
+    "test": "npx hardhat test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TechnicallyWeb3/wttp-site.git"
+  },
+  "keywords": [
+    "WTTP",
+    "web3",
+    "website",
+    "contract",
+    "web3",
+    "blockchain",
+    "ethereum"
+  ],
+  "author": "TechnicallyWeb3",
+  "license": "AGPL-3.0",
+  "bugs": {
+    "url": "https://github.com/TechnicallyWeb3/wttp-site/issues"
+  },
+  "homepage": "https://github.com/TechnicallyWeb3/wttp-site#readme",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.24.1"
+  },
+  "dependencies": {
+    "@tw3/esp": "^0.4.2",
+    "@tw3/wttp-core": "^0.0.1"
+  }
+}
