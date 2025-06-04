@@ -182,7 +182,7 @@ abstract contract WTTPStorage is WTTPPermissions {
     function _createResource(
         string memory _path,
         DataRegistration memory _dataRegistration
-    ) internal virtual returns (bytes32 _dataPointAddress) {
+    ) internal virtual notImmutable(_path) returns (bytes32 _dataPointAddress) {
 
         _dataPointAddress = DPS().calculateAddress(_dataRegistration.data);
 
@@ -213,7 +213,7 @@ abstract contract WTTPStorage is WTTPPermissions {
         string memory _path,
         bytes32 _dataPointAddress,
         uint256 _chunkIndex
-    ) internal virtual {
+    ) internal virtual notImmutable(_path) {
         if (_chunkIndex > resource[_path].length) {
             emit OutOfBoundsChunk(_path, _chunkIndex);
         } else if (_chunkIndex == resource[_path].length) {
@@ -240,7 +240,7 @@ abstract contract WTTPStorage is WTTPPermissions {
     /// @param _path Path of the resource to delete
     function _deleteResource(
         string memory _path
-    ) internal virtual {
+    ) internal virtual notImmutable(_path) {
         delete resource[_path];
         metadata[_path].size = 0;
         _deleteMetadata(_path);
@@ -255,11 +255,7 @@ abstract contract WTTPStorage is WTTPPermissions {
     function _uploadResource(
         string memory _path,
         DataRegistration[] memory _dataRegistration
-    )
-        internal virtual
-        notImmutable(_path)
-        returns (bytes32[] memory _dataPointAddresses)
-    {
+    ) internal virtual notImmutable(_path) returns (bytes32[] memory _dataPointAddresses) {
         _dataPointAddresses = new bytes32[](_dataRegistration.length);
         for (uint i = 0; i < _dataRegistration.length; i++) {
             _dataPointAddresses[i] = _createResource(_path, _dataRegistration[i]);

@@ -1,7 +1,7 @@
 import { expect } from "chai";
-import hre from "hardhat";
+import hre, { ethers } from "hardhat";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
-import { Web3Site } from "../typechain-types";
+import { Web3Site, WTTPSite } from "../typechain-types";
 import { DataPointStorage__factory, DataPointRegistry__factory } from "@tw3/esp";
 
 describe("Scripts Tests", function () {
@@ -768,9 +768,41 @@ describe("Scripts Tests", function () {
     });
 
     it("Should handle insufficient permissions", async function () {
-      const { site, owner } = await loadFixture(deployScriptFixture);
+      const { site, owner, siteAdmin } = await loadFixture(deployScriptFixture);
       
-      // Try to upload without proper permissions
+      // First, define a resource with restrictive permissions (no PUT allowed for non-admins)
+      const restrictiveHeader = {
+        methods: 7, // GET, HEAD, OPTIONS only - no PUT (bit 3)
+        cache: DEFAULT_HEADER.cache,
+        redirect: DEFAULT_HEADER.redirect,
+        resourceAdmin: hre.ethers.keccak256(hre.ethers.toUtf8Bytes("SPECIAL_ADMIN_ROLE"))
+      };
+      
+      // Site admin defines the resource with restrictive header
+      await site.connect(siteAdmin).DEFINE({
+        data: restrictiveHeader,
+        head: {
+          requestLine: {
+            path: "/unauthorized.txt",
+            protocol: "WTTP/3.0",
+            method: 8 // DEFINE
+          },
+          ifNoneMatch: hre.ethers.zeroPadBytes("0x", 32),
+          ifModifiedSince: 0
+        }
+      });
+      
+      // Check that PUT is not allowed by examining OPTIONS response
+      const optionsResponse = await site.OPTIONS({
+        path: "/unauthorized.txt",
+        protocol: "WTTP/3.0",
+        method: 1 // OPTIONS
+      });
+      
+      // The allowed methods should be 7 (GET, HEAD, OPTIONS only), not include PUT (bit 3)
+      expect(optionsResponse.allow).to.equal(7);
+      
+      // Now try to PUT using a non-admin account - this should return 405 Method Not Allowed
       const unauthorizedRequest = {
         head: {
           requestLine: {
@@ -792,10 +824,22 @@ describe("Scripts Tests", function () {
         }]
       };
       
-      // This should fail because no resource definition exists
-      await expect(
-        site.PUT(unauthorizedRequest, { value: hre.ethers.parseEther("0.0001") })
-      ).to.be.reverted;
+      // Execute the PUT and check the response from events
+      const putTx = await site.connect(siteAdmin).PUT(unauthorizedRequest, { value: hre.ethers.parseEther("0.0001") });
+      const receipt = await putTx.wait();
+    //   console.log(receipt);
+
+      const putResponseReceipt = receipt?.logs.find(log => site.interface.parseLog(log)?.name === "PUTSuccess");
+      const putResponse = site.interface.decodeEventLog("PUTSuccess", ethers.getBytes(putResponseReceipt?.data || "0x"), putResponseReceipt?.topics)?.putResponse;
+    //   console.log(putResponse);
+    //   console.log();
+
+      expect(putResponse).to.not.be.undefined;
+
+      const statusCode = putResponse.head?.responseLine?.code
+    //   console.log(statusCode);
+
+      expect(statusCode).to.equal(405); // Method Not Allowed
     });
 
     it("Should handle network timeouts gracefully", async function () {

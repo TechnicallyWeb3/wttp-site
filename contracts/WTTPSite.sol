@@ -44,7 +44,7 @@ abstract contract WTTPSite is WTTPStorage {
     /// @param _path Resource path being accessed
     modifier onlyResourceAdmin(string memory _path) {
         if (!_isResourceAdmin(_path, msg.sender)) {
-            revert Forbidden(msg.sender, _getResourceAdmin(_path));
+            revert Forbidden(msg.sender, _getResourceAdmin(_path), _path);
         }
         _;
     }
@@ -234,8 +234,11 @@ abstract contract WTTPSite is WTTPStorage {
     /// @return defineResponse Response containing updated header information
     function DEFINE(
         DEFINERequest memory defineRequest
-    ) external onlyResourceAdmin(defineRequest.head.requestLine.path) 
-    notImmutable(defineRequest.head.requestLine.path) returns (DEFINEResponse memory defineResponse) {
+    ) 
+    external 
+    onlyResourceAdmin(defineRequest.head.requestLine.path) 
+    notImmutable(defineRequest.head.requestLine.path) 
+    returns (DEFINEResponse memory defineResponse) {
         HEADRequest memory _headRequest = defineRequest.head;
         _headRequest.requestLine.method = Method.DEFINE;
         HEADResponse memory _headResponse = _HEAD(_headRequest);
@@ -274,8 +277,11 @@ abstract contract WTTPSite is WTTPStorage {
     /// @return deleteResponse Response confirming deletion
     function DELETE(
         HEADRequest memory deleteRequest
-    ) external onlyResourceAdmin(deleteRequest.requestLine.path) 
-    notImmutable(deleteRequest.requestLine.path) returns (HEADResponse memory deleteResponse) {
+    ) 
+    external 
+    onlyResourceAdmin(deleteRequest.requestLine.path) 
+    notImmutable(deleteRequest.requestLine.path) 
+    returns (HEADResponse memory deleteResponse) {
         deleteRequest.requestLine.method = Method.DELETE;
         deleteResponse = _HEAD(deleteRequest);
         if (
@@ -294,7 +300,10 @@ abstract contract WTTPSite is WTTPStorage {
     /// @return putResponse Response containing created resource information
     function PUT(
         PUTRequest memory putRequest
-    ) external payable onlyResourceAdmin(putRequest.head.requestLine.path) 
+    ) 
+    external payable 
+    notImmutable(putRequest.head.requestLine.path) 
+    onlyResourceAdmin(putRequest.head.requestLine.path) 
     returns (LOCATEResponse memory putResponse) {
         putRequest.head.requestLine.method = Method.PUT;
         HEADResponse memory _headResponse = _HEAD(putRequest.head);
@@ -328,8 +337,10 @@ abstract contract WTTPSite is WTTPStorage {
         // transfer change back to msg.sender
         if (msg.value > 0) {
             payable(msg.sender).transfer(msg.value);
-        }
+        } // TODO: remove, could cause issues on multiple calls from another contract
+
         emit PUTSuccess(msg.sender, putResponse);
+        // should we change Success to Event? Success indicates the data was PUT but could be rejected with a 405 for example
     }
 
     /// @notice Handles PATCH requests to update existing resources
@@ -338,8 +349,7 @@ abstract contract WTTPSite is WTTPStorage {
     /// @return patchResponse Response containing updated resource information
     function PATCH(
         PATCHRequest memory patchRequest
-    ) external payable onlyResourceAdmin(patchRequest.head.requestLine.path) 
-    notImmutable(patchRequest.head.requestLine.path) returns (LOCATEResponse memory patchResponse) {
+    ) external payable onlyResourceAdmin(patchRequest.head.requestLine.path) returns (LOCATEResponse memory patchResponse) {
         HEADRequest memory _headRequest = patchRequest.head;
         _headRequest.requestLine.method = Method.PATCH;
         HEADResponse memory _headResponse = _HEAD(_headRequest);
