@@ -126,19 +126,16 @@ export async function uploadFile(
   const signer = await ethers.provider.getSigner();
   const signerAddress = await signer.getAddress();
   
-  // Check if resource exists
+  // Check if resource exists - updated to new structure without requestLine wrapper
   const headRequest = {
-    requestLine: {
-      protocol: WTTP_VERSION,
-      path: destinationPath,
-      method: 1 // HEAD
-    },
+    path: destinationPath,
     ifModifiedSince: 0,
     ifNoneMatch: ethers.ZeroHash
   };
   
   const headResponse = await wtppSite.HEAD(headRequest);
-  const resourceExists = headResponse.responseLine.code !== 404n;
+  // Updated to use new response structure
+  const resourceExists = headResponse.status !== 404n;
   
   // Prepare data registrations
   const dataRegistrations = chunks.map((chunk, index) => ({
@@ -174,18 +171,21 @@ export async function uploadFile(
   
   let startIndex = 0;
 
-  const mimeTypeMatches = headResponse.metadata.mimeType === mimeTypeBytes2;
+  // Updated to use new metadata structure
+  const mimeTypeMatches = headResponse.metadata.properties.mimeType === mimeTypeBytes2;
 
   // Upload the file
   if (!resourceExists || !mimeTypeMatches) {
-    // Use PUT to create new resource
+    // Use PUT to create new resource - updated structure
     console.log("Resource does not exist, using PUT to create...");
     const putRequest = {
       head: headRequest,
-      mimeType: mimeTypeBytes2,
-      charset: "0x7556", // u8 = utf-8
-      encoding: "0x6964", // id = identity
-      language: "0x6575", // eu = english-US
+      properties: {
+        mimeType: mimeTypeBytes2,
+        charset: "0x7556", // u8 = utf-8
+        encoding: "0x6964", // id = identity
+        language: "0x6575" // eu = english-US
+      },
       data: [dataRegistrations[0]]
     };
     
@@ -209,13 +209,9 @@ export async function uploadFile(
   }
 
   
-  // Verify upload
+  // Verify upload - updated structure
   const locateRequest = {
-    requestLine: {
-      protocol: WTTP_VERSION,
-      path: destinationPath,
-      method: 7 // LOCATE
-    },
+    path: destinationPath,
     ifModifiedSince: 0,
     ifNoneMatch: ethers.ZeroHash
   };

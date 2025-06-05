@@ -3,21 +3,23 @@ import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 import { ethers } from "hardhat";
 import { getContractAddress } from "@tw3/esp";
 
-// Default header configuration for WTTP sites
+// Default header configuration for WTTP sites - updated to new structure
 const DEFAULT_HEADER = {
-  methods: 511, // All methods allowed (bitmask for all 9 methods)
   cache: {
-    maxAge: 3600, // 1 hour
-    noStore: false,
-    noCache: false,
     immutableFlag: false,
-    publicFlag: true
+    preset: 4, // MEDIUM cache preset
+    custom: ""
+  },
+  cors: {
+    methods: 511, // All methods allowed (bitmask for all 9 methods)
+    origins: [],
+    preset: 1, // PUBLIC CORS preset
+    custom: ""
   },
   redirect: {
     code: 0,
     location: ""
-  },
-  resourceAdmin: ethers.ZeroHash // Default admin role
+  }
 };
 
 const WTTPSiteModule = buildModule("WTTPSiteModule", (m) => {

@@ -14,9 +14,9 @@ task("deploy:site", "Deploy a single Web3Site contract with funding checks")
     types.string
   )
   .addOptionalParam(
-    "maxAge",
-    "Cache max age in seconds (defaults to 3600)",
-    "3600",
+    "cachePreset",
+    "Cache preset (0=NONE, 1=NO_CACHE, 2=DEFAULT, 3=SHORT, 4=MEDIUM, 5=LONG, 6=PERMANENT)",
+    "3",
     types.int
   )
   .addFlag(
@@ -31,7 +31,7 @@ task("deploy:site", "Deploy a single Web3Site contract with funding checks")
     console.log(`🚀 Web3Site Deployment Task`);
     console.log(`🌐 Network: ${hre.network.name}\n`);
 
-    const { dpr, owner, maxAge, skipVerify, autoFund } = taskArgs;
+    const { dpr, owner, cachePreset, skipVerify, autoFund } = taskArgs;
     
     try {
       // Get signers
@@ -62,24 +62,26 @@ task("deploy:site", "Deploy a single Web3Site contract with funding checks")
         console.log(`📍 Using @tw3/esp DPR: ${dprAddress}`);
       }
 
-      // Create default header
+      // Create default header - updated to new structure
       const defaultHeader = {
-        methods: 511, // All methods allowed
         cache: {
-          maxAge: maxAge,
-          noStore: false,
-          noCache: false,
           immutableFlag: false,
-          publicFlag: true
+          preset: cachePreset,
+          custom: ""
+        },
+        cors: {
+          methods: 511, // All methods allowed
+          origins: [],
+          preset: 1, // PUBLIC preset
+          custom: ""
         },
         redirect: {
           code: 0,
           location: ""
-        },
-        resourceAdmin: hre.ethers.ZeroHash
+        }
       };
 
-      console.log(`⚙️  Cache max age: ${maxAge}s`);
+      console.log(`⚙️  Cache preset: ${cachePreset}`);
 
       // Check balances and estimate costs
       const deployerBalance = await hre.ethers.provider.getBalance(deployer.address);
@@ -201,9 +203,9 @@ task("deploy:multichain", "Deploy Web3Site contracts across multiple chains")
     types.string
   )
   .addOptionalParam(
-    "maxAge",
-    "Cache max age in seconds (defaults to 3600)",
-    "3600",
+    "cachePreset",
+    "Cache preset (0=NONE, 1=NO_CACHE, 2=DEFAULT, 3=SHORT, 4=MEDIUM, 5=LONG, 6=PERMANENT)",
+    "3",
     types.int
   )
   .addFlag(
@@ -213,7 +215,7 @@ task("deploy:multichain", "Deploy Web3Site contracts across multiple chains")
   .setAction(async (taskArgs, hre) => {
     console.log(`🚀 Multi-Chain Web3Site Deployment Task\n`);
 
-    const { chains, dprAddresses, maxAge, skipVerify } = taskArgs;
+    const { chains, dprAddresses, cachePreset, skipVerify } = taskArgs;
 
     try {
       // Parse chain IDs
@@ -227,21 +229,23 @@ task("deploy:multichain", "Deploy Web3Site contracts across multiple chains")
         console.log(`📍 Custom DPR addresses:`, customDprAddresses);
       }
 
-      // Create custom header
+      // Create custom header - updated to new structure
       const customHeader = {
-        methods: 511,
         cache: {
-          maxAge: maxAge,
-          noStore: false,
-          noCache: false,
           immutableFlag: false,
-          publicFlag: true
+          preset: cachePreset,
+          custom: ""
+        },
+        cors: {
+          methods: 511,
+          origins: [],
+          preset: 1, // PUBLIC preset
+          custom: ""
         },
         redirect: {
           code: 0,
           location: ""
-        },
-        resourceAdmin: hre.ethers.ZeroHash
+        }
       };
 
       // Import and run multi-chain deployment
@@ -254,9 +258,8 @@ task("deploy:multichain", "Deploy Web3Site contracts across multiple chains")
         skipVerify
       );
 
-      console.log(`\n🎉 Multi-chain deployment completed!`);
-      console.log(`📊 Deployed to ${result.deployments.length} chains`);
-      console.log(`💰 Total cost: ${hre.ethers.formatEther(result.totalCost)} ETH`);
+      console.log("\n🎉 Multi-Chain Deployment Complete!");
+      return result;
 
     } catch (error) {
       console.error("❌ Multi-chain deployment failed:", error);
@@ -306,3 +309,5 @@ task("deploy:verify", "Verify deployed Web3Site contract")
       }
     }
   });
+
+export default {};

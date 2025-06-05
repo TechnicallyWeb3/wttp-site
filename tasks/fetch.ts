@@ -44,11 +44,11 @@ task("fetch", "Fetch a resource from a WTTP site via the WTTPGateway")
     let mimeType = undefined;
     if (head) {
       headData = response;
-      mimeType = headData.metadata.mimeType;
+      mimeType = headData.metadata.properties.mimeType;
       console.log("\n=== HEAD Response ==="); 
     } else {
       headData = response.head;
-      mimeType = headData.metadata.mimeType;
+      mimeType = headData.metadata.properties.mimeType;
       console.log("\n=== GET Response ===");
       console.log("\n=== Content ===");
       if (isText(mimeType)) {
@@ -62,9 +62,9 @@ task("fetch", "Fetch a resource from a WTTP site via the WTTPGateway")
     console.log(`ETag: ${headData.etag}`);
     console.log(`Last Modified: ${new Date(Number(headData.metadata.lastModified) * 1000).toISOString()}`);
     console.log(`Content-Type: ${bytes2ToMimeType(mimeType)}`);
-    console.log(`Charset: ${headData.metadata.charset}`);
-    console.log(`Encoding: ${headData.metadata.encoding}`);
-    console.log(`Language: ${headData.metadata.language}`);
+    console.log(`Charset: ${headData.metadata.properties.charset}`);
+    console.log(`Encoding: ${headData.metadata.properties.encoding}`);
+    console.log(`Language: ${headData.metadata.properties.language}`);
     console.log(`Size: ${headData.metadata.size} bytes`);
     console.log(`Version: ${headData.metadata.version}`);
     

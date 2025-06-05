@@ -4,21 +4,23 @@ import { Web3Site } from "../typechain-types";
 import { addDeployment, formatDeploymentData } from './AddDeployment';
 import { getContractAddress } from "@tw3/esp";
 
-// Default header configuration for WTTP sites
+// Default header configuration for WTTP sites - updated to new structure
 const DEFAULT_HEADER = {
-  methods: 511, // All methods allowed (bitmask for all 9 methods)
   cache: {
-    maxAge: 3600, // 1 hour
-    noStore: false,
-    noCache: false,
     immutableFlag: false,
-    publicFlag: true
+    preset: 3, // MEDIUM cache preset
+    custom: ""
+  },
+  cors: {
+    methods: 511, // All methods allowed (bitmask for all 9 methods)
+    origins: [],
+    preset: 1, // PUBLIC CORS preset
+    custom: ""
   },
   redirect: {
     code: 0,
     location: ""
-  },
-  resourceAdmin: hre.ethers.ZeroHash // Default admin role
+  }
 };
 
 /**
@@ -44,9 +46,9 @@ export async function deployWeb3SiteMultiChain(
   
   console.log("📋 Multi-Chain Deployment Configuration:");
   console.log(`Target chains: ${chainIds.join(", ")}`);
-  console.log(`Default header methods: ${defaultHeader.methods}`);
-  console.log(`Cache max age: ${defaultHeader.cache.maxAge}s`);
-  console.log(`Resource admin: ${defaultHeader.resourceAdmin}\n`);
+  console.log(`Default header CORS methods: ${defaultHeader.cors.methods}`);
+  console.log(`Cache preset: ${defaultHeader.cache.preset}`);
+  console.log(`CORS preset: ${defaultHeader.cors.preset}\n`);
 
   // ========================================
   // STEP 1: Collect Network Information

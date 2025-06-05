@@ -28,15 +28,9 @@ export async function fetchResourceFromSite(
   // Get the site contract
   const siteContract = await ethers.getContractAt("Web3Site", siteAddress) as Web3Site;
 
-  // Create the request
-  const requestLine = {
-    path: path,
-    protocol: "WTTP/3.0",
-    method: headRequest ? 1 : 0 // HEAD = 1, GET = 0
-  };
-
+  // Create the request - updated to new structure without requestLine wrapper
   const headRequest_obj = {
-    requestLine,
+    path: path,
     ifModifiedSince,
     ifNoneMatch
   };
@@ -55,13 +49,14 @@ export async function fetchResourceFromSite(
   console.log(`Fetching resource at ${path} from site ${siteAddress}`);
   const locateResponse = await siteContract.GET(headRequest_obj);
   
-  console.log(`Response status: ${locateResponse.head.responseLine.code}`);
+  // Updated to use new response structure without responseLine wrapper
+  console.log(`Response status: ${locateResponse.head.status}`);
   console.log(`Found ${locateResponse.dataPoints.length} data points`);
 
   // If the response is successful and has datapoints, read the content
   let content: Uint8Array | null = null;
   
-  if ((locateResponse.head.responseLine.code === 200n || locateResponse.head.responseLine.code === 206n) 
+  if ((locateResponse.head.status === 200n || locateResponse.head.status === 206n) 
       && locateResponse.dataPoints.length > 0) {
     content = await readDataPointsContent(siteAddress, locateResponse.dataPoints, chainId);
   }
@@ -157,9 +152,9 @@ export async function main(
   let rawData: Uint8Array | null = null;
   
   if (result.type === 'HEAD') {
-    // For HEAD requests, return just the metadata
+    // For HEAD requests, return just the metadata - updated to use new response structure
     return {
-      status: result.response.responseLine.code,
+      status: result.response.status,
       metadata: result.response.metadata,
       etag: result.response.etag,
       content: null,
@@ -170,10 +165,11 @@ export async function main(
     const getResponse = result.response;
     rawData = result.content;
     
-    if (getResponse.head.responseLine.code === 200n || getResponse.head.responseLine.code === 206n) {
+    // Updated to use new response structure
+    if (getResponse.head.status === 200n || getResponse.head.status === 206n) {
       if (rawData && rawData.length > 0) {
         // Convert the response data to a string if it's text
-        const mimeType = getResponse.head.metadata.mimeType;
+        const mimeType = getResponse.head.metadata.properties.mimeType;
         
         if (isText(mimeType)) {
           content = ethers.toUtf8String(rawData);
@@ -184,7 +180,7 @@ export async function main(
     }
     
     return {
-      status: getResponse.head.responseLine.code,
+      status: getResponse.head.status,
       metadata: getResponse.head.metadata,
       etag: getResponse.head.etag,
       content,

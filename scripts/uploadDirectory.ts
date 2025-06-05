@@ -129,19 +129,16 @@ export async function uploadDirectory(
   const dprAddress = await wtppSite.DPR();
   const dpr = await ethers.getContractAt("DataPointRegistry", dprAddress);
   
-  // Check if resource exists
+  // Check if resource exists - updated to new structure without requestLine wrapper
   const headRequest = {
-    requestLine: {
-      protocol: WTTP_VERSION,
-      path: destinationPath,
-      method: 1 // HEAD
-    },
+    path: destinationPath,
     ifModifiedSince: 0,
     ifNoneMatch: ethers.ZeroHash
   };
   
   const headResponse = await wtppSite.HEAD(headRequest);
-  const resourceExists = headResponse.responseLine.code !== 404n;
+  // Updated to use new response structure
+  const resourceExists = headResponse.status !== 404n;
   
   // Upload the directory metadata with redirect header
   console.log("Uploading directory metadata with redirect header...");
@@ -187,23 +184,25 @@ export async function uploadDirectory(
     await tx.wait();
     console.log("Directory updated successfully!");
     
-    // Use DEFINE to ensure the directory has the correct headers
+    // Use DEFINE to ensure the directory has the correct headers - updated structure
     const defineRequest = {
       head: headRequest,
       data: {
-        methods: 65535, // All methods allowed (2^16 - 1)
         cache: {
-          maxAge: 0,
-          noStore: false,
-          noCache: false,
           immutableFlag: false,
-          publicFlag: false
+          preset: 0, // NONE preset for custom behavior
+          custom: "no-cache"
+        },
+        cors: {
+          methods: 65535, // All methods allowed (2^16 - 1)
+          origins: [],
+          preset: 1, // PUBLIC preset
+          custom: ""
         },
         redirect: {
           code: 300, // Multiple Choices
           location: indexLocation
-        },
-        resourceAdmin: ethers.ZeroHash
+        }
       }
     };
     
@@ -211,55 +210,49 @@ export async function uploadDirectory(
     await defineTx.wait();
     console.log("Directory headers updated successfully!");
   } else {
-    // Use PUT to create the directory resource with custom headers
+    // Use PUT to create the directory resource with custom headers - updated structure
     console.log(`Creating directory ${destinationPath}...`);
 
     const putRequest = {
       head: headRequest,
-      mimeType: "0x0001", // indicates directory
-      charset: "0x0000", // No metadata
-      encoding: "0x0000", // No metadata
-      language: "0x0000", // No metadata
-      data: [dataRegistrations[0]],
-      headers: [
-        {
-          name: "Status",
-          value: "300" // Multiple Choices
-        },
-        {
-          name: "Location",
-          value: indexLocation
-        }
-      ]
+      properties: {
+        mimeType: "0x0001", // indicates directory
+        charset: "0x0000", // No metadata
+        encoding: "0x0000", // No metadata
+        language: "0x0000" // No metadata
+      },
+      data: [dataRegistrations[0]]
     };
     
     const tx = await wtppSite.PUT(putRequest, { value: royalty[0] });
     await tx.wait();
     console.log("Directory created successfully!");
     
-    // Use DEFINE to ensure the directory has the correct headers
+    // Use DEFINE to ensure the directory has the correct headers - updated structure
     const defineRequest = {
       head: headRequest,
       data: {
-        methods: 65535, // All methods allowed (2^16 - 1)
         cache: {
-          maxAge: 0,
-          noStore: false,
-          noCache: false,
           immutableFlag: false,
-          publicFlag: false
+          preset: 0, // NONE preset for custom behavior
+          custom: "no-cache"
+        },
+        cors: {
+          methods: 65535, // All methods allowed (2^16 - 1)  
+          origins: [],
+          preset: 1, // PUBLIC preset
+          custom: ""
         },
         redirect: {
           code: 300, // Multiple Choices
           location: indexLocation
-        },
-        resourceAdmin: ethers.ZeroHash
+        }
       }
     };
     
     const defineTx = await wtppSite.DEFINE(defineRequest);
     await defineTx.wait();
-    console.log("Directory headers updated successfully!");
+    console.log("Directory headers set successfully!");
   }
   
   // Upload remaining chunks if any
@@ -338,20 +331,16 @@ export async function uploadDirectory(
     const dataPointAddress = await dps.calculateAddress(dataRegistrations[0].data);
     royalty[0] = await dpr.getDataPointRoyalty(dataPointAddress);
     
-    // Create subdirectory head request
+    // Create subdirectory head request - updated to new structure
     const subDirHeadRequest = {
-      requestLine: {
-        protocol: WTTP_VERSION,
-        path: destinationDirPath,
-        method: 1 // HEAD
-      },
+      path: destinationDirPath,
       ifModifiedSince: 0,
       ifNoneMatch: ethers.ZeroHash
     };
     
-    // Check if subdirectory already exists
+    // Check if subdirectory already exists - updated to new response structure
     const subDirHeadResponse = await wtppSite.HEAD(subDirHeadRequest);
-    const subDirExists = subDirHeadResponse.responseLine.code !== 404n;
+    const subDirExists = subDirHeadResponse.status !== 404n;
     
     if (subDirExists) {
       // Use PATCH to update the existing subdirectory
@@ -365,23 +354,25 @@ export async function uploadDirectory(
       await tx.wait();
       console.log(`Subdirectory ${destinationDirPath} updated successfully!`);
       
-      // Use DEFINE to ensure the subdirectory has the correct headers
+      // Use DEFINE to ensure the subdirectory has the correct headers - updated structure
       const defineRequest = {
         head: subDirHeadRequest,
         data: {
-          methods: 65535, // All methods allowed (2^16 - 1)
           cache: {
-            maxAge: 0,
-            noStore: false,
-            noCache: false,
             immutableFlag: false,
-            publicFlag: false
+            preset: 0, // NONE preset for custom behavior
+            custom: "no-cache"
+          },
+          cors: {
+            methods: 65535, // All methods allowed (2^16 - 1)
+            origins: [],
+            preset: 1, // PUBLIC preset
+            custom: ""
           },
           redirect: {
             code: 300, // Multiple Choices
             location: subDirIndexLocation
-          },
-          resourceAdmin: ethers.ZeroHash
+          }
         }
       };
       
@@ -389,48 +380,42 @@ export async function uploadDirectory(
       await defineTx.wait();
       console.log(`Subdirectory ${destinationDirPath} headers updated successfully!`);
     } else {
-      // Use PUT to create the subdirectory resource with custom headers
+      // Use PUT to create the subdirectory resource with custom headers - updated structure
       console.log(`Creating subdirectory ${destinationDirPath} with redirect header...`);
       const putRequest = {
         head: subDirHeadRequest,
-        mimeType: "0x0001", // Directory mime type
-        charset: "0x0000", // No metadata
-        encoding: "0x0000", // No metadata
-        language: "0x0000", // No metadata
-        data: [dataRegistrations[0]],
-        headers: [
-          {
-            name: "Status",
-            value: "300" // Multiple Choices
-          },
-          {
-            name: "Location",
-            value: subDirIndexLocation
-          }
-        ]
+        properties: {
+          mimeType: "0x0001", // Directory mime type
+          charset: "0x0000", // No metadata
+          encoding: "0x0000", // No metadata
+          language: "0x0000" // No metadata
+        },
+        data: [dataRegistrations[0]]
       };
     
       const tx = await wtppSite.PUT(putRequest, { value: royalty[0] });
       await tx.wait();
       console.log(`Subdirectory ${destinationDirPath} created successfully!`);
       
-      // Use DEFINE to ensure the subdirectory has the correct headers
+      // Use DEFINE to ensure the subdirectory has the correct headers - updated structure
       const defineRequest = {
         head: subDirHeadRequest,
         data: {
-          methods: 65535, // All methods allowed (2^16 - 1)
           cache: {
-            maxAge: 0,
-            noStore: false,
-            noCache: false,
             immutableFlag: false,
-            publicFlag: false
+            preset: 0, // NONE preset for custom behavior
+            custom: "no-cache"
+          },
+          cors: {
+            methods: 65535, // All methods allowed (2^16 - 1)
+            origins: [],
+            preset: 1, // PUBLIC preset
+            custom: ""
           },
           redirect: {
             code: 300, // Multiple Choices
             location: subDirIndexLocation
-          },
-          resourceAdmin: ethers.ZeroHash
+          }
         }
       };
       

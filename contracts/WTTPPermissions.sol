@@ -12,12 +12,14 @@ abstract contract WTTPPermissions is AccessControl {
     /// @notice Role identifier for site administrators
     /// @dev Calculated via keccak256 during construction. Site admins have elevated privileges but below the DEFAULT_ADMIN_ROLE
     bytes32 internal SITE_ADMIN_ROLE;
+    bytes32 internal PUBLIC_ROLE;
 
     /// @notice Sets up initial roles and permissions
     /// @dev Creates the SITE_ADMIN_ROLE and establishes DEFAULT_ADMIN_ROLE as its admin
     /// @param _owner Address of the contract owner who receives the DEFAULT_ADMIN_ROLE
     constructor(address _owner) {
         SITE_ADMIN_ROLE = keccak256("SITE_ADMIN_ROLE");
+        PUBLIC_ROLE = bytes32(uint256(type(uint256).max));
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
         _setRoleAdmin(SITE_ADMIN_ROLE, DEFAULT_ADMIN_ROLE);
     }
@@ -28,8 +30,15 @@ abstract contract WTTPPermissions is AccessControl {
     /// @param account The address to check for the role
     /// @return bool True if the account has the role or is a DEFAULT_ADMIN_ROLE holder
     function hasRole(bytes32 role, address account) public view override virtual returns (bool) {
+        // If the account is a DEFAULT_ADMIN_ROLE holder, they have access to all roles.
         if (super.hasRole(DEFAULT_ADMIN_ROLE, account)) {
             return true;
+        }
+        // Since no one has the PUBLIC_ROLE, we check the inverse of hasRole. 
+        // This enables us to include a public blacklist by granting the role.
+        // Would even override an admin role if granted.
+        if (role == PUBLIC_ROLE) {
+            return !super.hasRole(PUBLIC_ROLE, account);
         }
         return super.hasRole(role, account);
     }
@@ -41,7 +50,6 @@ abstract contract WTTPPermissions is AccessControl {
         if(
             role == SITE_ADMIN_ROLE || 
             role == DEFAULT_ADMIN_ROLE
-            // || role == PUBLIC_ROLE
         ) {
             revert InvalidRole(role);
         }
@@ -60,7 +68,14 @@ abstract contract WTTPPermissions is AccessControl {
     /// @dev Allows wiping all current site admin permissions by changing the role hash
     /// @param _newSiteAdmin The new role identifier to use for site administrators
     function changeSiteAdmin(bytes32 _newSiteAdmin) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        emit SiteAdminChanged(SITE_ADMIN_ROLE, _newSiteAdmin);
         SITE_ADMIN_ROLE = _newSiteAdmin;
+        emit SiteAdminChanged(SITE_ADMIN_ROLE, _newSiteAdmin);
+    }
+
+    /// @notice Blacklists an account from all roles
+    /// @dev Removes the account from the public role... by adding it to the PUBLIC_ROLE
+    /// @param _account The address to blacklist
+    function revokeAllRoles(address _account) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _grantRole(PUBLIC_ROLE, _account);
     }
 }

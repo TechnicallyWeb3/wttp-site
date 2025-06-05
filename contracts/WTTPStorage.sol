@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import "./WTTPPermissions.sol";
-import "@tw3/esp/contracts/interfaces/IDataPointRegistry.sol";
 
 /// @title WTTP Storage Contract
 /// @notice Manages web resource storage and access control
@@ -21,7 +20,7 @@ abstract contract WTTPStorage is WTTPPermissions {
         HeaderInfo memory _defaultHeader
     ) WTTPPermissions(_owner) {
         DPR_ = IDataPointRegistry(_dpr);
-        header[bytes32(0)] = _defaultHeader;
+        _setDefaultHeader(_defaultHeader);
     }
 
     /// @notice Maximum number of methods that can be stored in a header
@@ -76,7 +75,7 @@ abstract contract WTTPStorage is WTTPPermissions {
     /// @param _path Path of the resource to check
     modifier notImmutable(string memory _path) {
         if (header[metadata[_path].header].cache.immutableFlag && resource[_path].length > 0) {
-            revert ResourceImmutable(_path);
+            revert _409(_path);
         }
         _;
     }
@@ -94,30 +93,47 @@ abstract contract WTTPStorage is WTTPPermissions {
     ) internal virtual returns (bytes32 headerAddress) {
         headerAddress = getHeaderAddress(_header);
 
-        // comparing against methods == 0 will save gas, but this is more accurate
-        // if (getHeaderAddress(header[headerAddress]) == getHeaderAddress(zeroHeader)) {
-        if (header[headerAddress].methods == 0) {
+        if (header[headerAddress].cors.origins.length == 0) {
+            if (_header.cors.origins.length != uint8(type(Method).max) + 1) {
+                revert InvalidHeader(_header);
+            }
             header[headerAddress] = _header;
         }
     }
 
     /// @notice Retrieves header information by its address
     /// @dev Internal view function to access header mapping
-    /// @param _headerAddress The unique identifier of the header
+    /// @param _path The path of the resource
     /// @return HeaderInfo The header information
     function _readHeader(
-        bytes32 _headerAddress
+        string memory _path
     ) internal virtual view returns (HeaderInfo memory) {
-        return header[_headerAddress];
+        return header[_readMetadata(_path).header];
     }
+
+    // was debating on using a _readHeaderByAddress function, but decided against it
+    // we don't need this since a HEAD response includes both the header address and the HeaderInfo
+    // do we need to get HeaderInfo from a header address?
 
     /// @notice Sets the default header information
     /// @dev Default header is stored at bytes32(0)
     /// @param _header The header information to use as default
-    function _setDefaultHeader(
-        HeaderInfo memory _header
-    ) internal virtual {
+    function _setDefaultHeader(HeaderInfo memory _header) internal virtual {
+        if (_header.cors.origins.length != uint8(type(Method).max) + 1) {
+            revert InvalidHeader(_header);
+        }
         header[bytes32(0)] = _header;
+    }
+
+    /// @notice Updates the default header information
+    /// @dev Only site admins can modify the default header
+    /// @notice Must be elevated above SITE_ADMIN_ROLE, site admins can change the header of any 
+    /// resource they have access to, so we need to be more specific here to avoid security issues
+    /// @param _header The header information to use as default
+    function setDefaultHeader(
+        HeaderInfo memory _header
+    ) external virtual onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setDefaultHeader(_header);
     }
 
     // ===== Metadata operations =====
@@ -173,6 +189,17 @@ abstract contract WTTPStorage is WTTPPermissions {
     }
 
     // ===== Resource operations =====
+
+    /// @notice Checks if a resource exists
+    /// @dev Returns true if the resource has at least one data point
+    /// @param _path Path of the resource to check
+    /// @return True if the resource exists, false otherwise
+    function _resourceExists(
+        string memory _path
+    ) internal virtual view returns (bool) {
+        ResourceMetadata memory _metadata = _readMetadata(_path);
+        return _metadata.size > 0 && _metadata.version > 0;
+    }
     
     /// @notice Creates a new data point for a resource
     /// @dev Registers the data point in DPR and updates resource mapping
