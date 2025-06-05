@@ -48,8 +48,16 @@ abstract contract WTTPPermissions is AccessControl {
     modifier notAdminRole(bytes32 role) {
         if(
             role == SITE_ADMIN_ROLE || 
-            role == DEFAULT_ADMIN_ROLE ||
-            role == PUBLIC_ROLE ||
+            role == DEFAULT_ADMIN_ROLE
+        ) {
+            revert InvalidRole(role);
+        }
+        _;
+    }
+
+    modifier notPublicRole(bytes32 role) {
+        if(
+            role == PUBLIC_ROLE || 
             role == BLACKLIST_ROLE
         ) {
             revert InvalidRole(role);
@@ -60,7 +68,8 @@ abstract contract WTTPPermissions is AccessControl {
     /// @notice Creates a new resource-specific admin role
     /// @dev Sets the SITE_ADMIN_ROLE as the admin of the new role, preventing creation of privileged roles
     /// @param _role The new role identifier to create
-    function createResourceRole(bytes32 _role) external onlyRole(SITE_ADMIN_ROLE) notAdminRole(_role) {
+    function createResourceRole(bytes32 _role) external 
+    onlyRole(SITE_ADMIN_ROLE) notAdminRole(_role) notPublicRole(_role) {
         _setRoleAdmin(_role, SITE_ADMIN_ROLE);
         emit ResourceRoleCreated(_role);
     }

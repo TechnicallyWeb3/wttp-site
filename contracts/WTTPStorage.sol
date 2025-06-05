@@ -74,7 +74,7 @@ abstract contract WTTPStorage is WTTPPermissions {
     /// @dev Checks if the resource's header has the immutable flag set and if the resource exists
     /// @param _path Path of the resource to check
     modifier notImmutable(string memory _path) {
-        if (header[metadata[_path].header].cache.immutableFlag && resource[_path].length > 0) {
+        if (header[metadata[_path].header].cache.immutableFlag && _resourceExists(_path)) {
             revert _409(_path);
         }
         _;
