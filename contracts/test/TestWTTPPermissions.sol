@@ -23,8 +23,14 @@ contract TestWTTPPermissions is WTTPPermissions {
 
     /// @notice Public getter for the PUBLIC_ROLE variable
     /// @return bytes32 The public role identifier
-    function getPublicRole() external view returns (bytes32) {
+    function getPublicRole() external pure returns (bytes32) {
         return PUBLIC_ROLE;
+    }
+
+    /// @notice Public getter for the BLACKLIST_ROLE variable
+    /// @return bytes32 The blacklist role identifier
+    function getBlacklistRole() external pure returns (bytes32) {
+        return BLACKLIST_ROLE;
     }
 
     // ========== Exposed Internal Modifiers ==========
@@ -42,13 +48,6 @@ contract TestWTTPPermissions is WTTPPermissions {
     /// @param _newRole The new site admin role identifier
     function setSiteAdminRoleForTesting(bytes32 _newRole) external {
         SITE_ADMIN_ROLE = _newRole;
-    }
-
-    /// @notice Public setter for PUBLIC_ROLE for testing purposes
-    /// @dev Allows direct manipulation of the role for debugging
-    /// @param _newRole The new public role identifier
-    function setPublicRoleForTesting(bytes32 _newRole) external {
-        PUBLIC_ROLE = _newRole;
     }
 
     // ========== Test Helper Functions ==========
@@ -76,16 +75,20 @@ contract TestWTTPPermissions is WTTPPermissions {
             return true;
         }
         if (role == PUBLIC_ROLE) {
-            return !super.hasRole(PUBLIC_ROLE, account);
+            return !super.hasRole(BLACKLIST_ROLE, account);
         }
         return super.hasRole(role, account);
     }
 
-    /// @notice Test access to the parent hasRole function directly
-    /// @param role The role identifier to check
-    /// @param account The address to check for the role
-    /// @return bool True if the account has the role according to parent implementation
-    function testParentHasRole(bytes32 role, address account) external view returns (bool) {
-        return super.hasRole(role, account);
+    /// @notice Blacklist function for testing - replicates what revokeAllRoles would do
+    /// @param _account The address to blacklist
+    function blacklistForTesting(address _account) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _grantRole(BLACKLIST_ROLE, _account);
+    }
+
+    /// @notice Un-blacklist function for testing
+    /// @param _account The address to remove from blacklist
+    function unblacklistForTesting(address _account) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _revokeRole(BLACKLIST_ROLE, _account);
     }
 } 

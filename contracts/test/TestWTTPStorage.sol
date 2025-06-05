@@ -245,4 +245,36 @@ contract TestWTTPStorage is WTTPStorage {
         return meta.lastModified;
     }
 
+    // ========== Role Access Methods ==========
+    
+    /// @notice Public getter for the SITE_ADMIN_ROLE variable
+    /// @return bytes32 The site admin role identifier
+    function getSiteAdminRole() external view returns (bytes32) {
+        return SITE_ADMIN_ROLE;
+    }
+
+    /// @notice Public getter for the PUBLIC_ROLE variable
+    /// @return bytes32 The public role identifier
+    function getPublicRole() external pure returns (bytes32) {
+        return PUBLIC_ROLE;
+    }
+
+    /// @notice Public getter for the BLACKLIST_ROLE variable
+    /// @return bytes32 The blacklist role identifier
+    function getBlacklistRole() external pure returns (bytes32) {
+        return BLACKLIST_ROLE;
+    }
+
+    /// @notice Blacklist function for testing - replicates what revokeAllRoles would do
+    /// @param _account The address to blacklist
+    function blacklistForTesting(address _account) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _grantRole(BLACKLIST_ROLE, _account);
+    }
+
+    /// @notice Un-blacklist function for testing
+    /// @param _account The address to remove from blacklist
+    function unblacklistForTesting(address _account) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _revokeRole(BLACKLIST_ROLE, _account);
+    }
+
 } 
