@@ -106,46 +106,6 @@ contract TestWTTPSite is WTTPSite {
     }
 
     // ========== Debugging Helper Functions ==========
-    
-    /// @notice Check what the onlyAuthorized modifier would do without calling it
-    /// @param _path Resource path being accessed
-    /// @param _method Method type being requested
-    /// @param _account Account to check authorization for
-    /// @return authorized True if authorized
-    /// @return methodAllowed_ True if method is allowed
-    /// @return authorizedRole The role that has access
-    function checkAuthorization(
-        string memory _path, 
-        Method _method, 
-        address _account
-    ) external view returns (bool authorized, bool methodAllowed_, bytes32 authorizedRole) {
-        methodAllowed_ = _methodAllowed(_path, _method);
-        authorizedRole = _getAuthorizedRole(_path, _method);
-        authorized = _isAuthorized(_path, _method, _account);
-    }
-
-    /// @notice Check what the resourceExists modifier would do without calling it
-    /// @param _path Resource path to check
-    /// @return exists True if resource exists
-    /// @return gone True if resource was deleted (gone)
-    /// @return wouldRevert True if the modifier would revert
-    /// @return errorCode HTTP error code that would be thrown (404 or 410)
-    function checkResourceExists(string memory _path) external view returns (
-        bool exists, 
-        bool gone, 
-        bool wouldRevert, 
-        uint16 errorCode
-    ) {
-        exists = _resourceExists(_path);
-        gone = _resourceGone(_path);
-        wouldRevert = !exists;
-        
-        if (!exists) {
-            errorCode = gone ? 410 : 404;
-        } else {
-            errorCode = 0;
-        }
-    }
 
     /// @notice Test method bits for a given method
     /// @param _method The method to get the bit for
@@ -170,26 +130,6 @@ contract TestWTTPSite is WTTPSite {
         ResourceMetadata memory _metadata = _readMetadata(_path);
         bytes32[] memory resourceData = _readResource(_path);
         return calculateEtag(_metadata, resourceData);
-    }
-
-    /// @notice Test conditional request logic
-    /// @param _path Resource path
-    /// @param _ifNoneMatch ETag for if-none-match header
-    /// @param _ifModifiedSince Timestamp for if-modified-since header
-    /// @return notModified True if resource was not modified
-    /// @return currentEtag Current ETag of the resource
-    /// @return lastModified Last modified timestamp
-    function testConditionalRequest(
-        string memory _path,
-        bytes32 _ifNoneMatch,
-        uint256 _ifModifiedSince
-    ) external view returns (bool notModified, bytes32 currentEtag, uint256 lastModified) {
-        ResourceMetadata memory _metadata = _readMetadata(_path);
-        bytes32[] memory resourceData = _readResource(_path);
-        currentEtag = calculateEtag(_metadata, resourceData);
-        lastModified = _metadata.lastModified;
-        
-        notModified = (currentEtag == _ifNoneMatch) || (_ifModifiedSince > lastModified);
     }
 
     // ========== Access to Inherited Functions ==========
@@ -240,52 +180,6 @@ contract TestWTTPSite is WTTPSite {
     /// @param _path Path of the resource to delete
     function deleteResourcePublic(string memory _path) external {
         _deleteResource(_path);
-    }
-
-    /// @notice Public access to inherited _uploadResource from WTTPStorage
-    /// @param _path Path of the resource
-    /// @param _dataRegistration Array of registration data for multiple chunks
-    /// @return bytes32[] Array of addresses for the created data points
-    function uploadResourcePublic(
-        string memory _path,
-        DataRegistration[] memory _dataRegistration
-    ) external payable returns (bytes32[] memory) {
-        return _uploadResource(_path, _dataRegistration);
-    }
-
-    // ========== Additional Test Utilities ==========
-    
-    /// @notice Simulate a complete HTTP request flow for testing
-    /// @param _path Resource path
-    /// @param _method HTTP method
-    /// @param _account Account making the request
-    /// @return statusCode HTTP status code that would be returned
-    /// @return authorized Whether the request would be authorized
-    /// @return resourceExists_ Whether the resource exists
-    function simulateRequest(
-        string memory _path,
-        Method _method,
-        address _account
-    ) external view returns (uint16 statusCode, bool authorized, bool resourceExists_) {
-        resourceExists_ = _resourceExists(_path);
-        
-        if (!_methodAllowed(_path, _method)) {
-            return (405, false, resourceExists_); // Method Not Allowed
-        }
-        
-        authorized = _isAuthorized(_path, _method, _account);
-        if (!authorized) {
-            return (403, false, resourceExists_); // Forbidden
-        }
-        
-        if (!resourceExists_) {
-            if (_resourceGone(_path)) {
-                return (410, authorized, resourceExists_); // Gone
-            }
-            return (404, authorized, resourceExists_); // Not Found
-        }
-        
-        return (200, authorized, resourceExists_); // OK
     }
 
     /// @notice Get all information about a resource in one call

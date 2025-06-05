@@ -8,17 +8,6 @@ import "../WTTPStorage.sol";
 /// @dev Provides a deployable implementation of the WTTP storage system with exposed internal methods and full debugging access
 contract TestWTTPStorage is WTTPStorage {
 
-    // ========== Test-only Storage for Direct Access ==========
-    
-    /// @notice Test storage for direct header manipulation
-    mapping(bytes32 => HeaderInfo) public testHeaders;
-    
-    /// @notice Test storage for direct metadata manipulation  
-    mapping(string => ResourceMetadata) public testMetadata;
-    
-    /// @notice Test storage for direct resource manipulation
-    mapping(string => bytes32[]) public testResources;
-
     /// @notice Initializes the storage contract with test dependencies
     /// @dev Sets up DPR, default header, and owner for testing
     /// @param _owner Address that will receive the DEFAULT_ADMIN_ROLE
@@ -65,20 +54,6 @@ contract TestWTTPStorage is WTTPStorage {
         return _readHeader(_path);
     }
 
-    /// @notice Store header in test storage for direct manipulation
-    /// @param _headerAddress The header address to set
-    /// @param _header The header information to store
-    function setTestHeader(bytes32 _headerAddress, HeaderInfo memory _header) external {
-        testHeaders[_headerAddress] = _header;
-    }
-
-    /// @notice Get header from test storage
-    /// @param _headerAddress The header address to read
-    /// @return HeaderInfo The header information at the given address
-    function getTestHeader(bytes32 _headerAddress) external view returns (HeaderInfo memory) {
-        return testHeaders[_headerAddress];
-    }
-
     /// @notice Public wrapper for _setDefaultHeader
     /// @param _header The header information to use as default
     function setDefaultHeaderPublic(HeaderInfo memory _header) external {
@@ -94,20 +69,6 @@ contract TestWTTPStorage is WTTPStorage {
         string memory _path
     ) external view returns (ResourceMetadata memory _metadata) {
         return _readMetadata(_path);
-    }
-
-    /// @notice Store metadata in test storage for direct manipulation
-    /// @param _path Path of the resource
-    /// @param _metadata Metadata to store
-    function setTestMetadata(string memory _path, ResourceMetadata memory _metadata) external {
-        testMetadata[_path] = _metadata;
-    }
-
-    /// @notice Get metadata from test storage
-    /// @param _path Path of the resource
-    /// @return ResourceMetadata The metadata stored at the path
-    function getTestMetadata(string memory _path) external view returns (ResourceMetadata memory) {
-        return testMetadata[_path];
     }
 
     /// @notice Public wrapper to update metadata stats for testing
@@ -143,20 +104,6 @@ contract TestWTTPStorage is WTTPStorage {
         string memory _path
     ) external view returns (bool) {
         return _resourceExists(_path);
-    }
-
-    /// @notice Store resource in test storage for direct manipulation
-    /// @param _path Path of the resource
-    /// @param _dataPoints Array of data point addresses to store
-    function setTestResource(string memory _path, bytes32[] memory _dataPoints) external {
-        testResources[_path] = _dataPoints;
-    }
-
-    /// @notice Get resource from test storage
-    /// @param _path Path of the resource
-    /// @return bytes32[] Array of data point addresses
-    function getTestResource(string memory _path) external view returns (bytes32[] memory) {
-        return testResources[_path];
     }
 
     /// @notice Public wrapper to create resources for testing
@@ -222,7 +169,6 @@ contract TestWTTPStorage is WTTPStorage {
     /// @param _path Path to check
     /// @return bool True if the resource is immutable and exists (using internal functions)
     function isResourceImmutable(string memory _path) external view returns (bool) {
-        ResourceMetadata memory meta = _readMetadata(_path);
         HeaderInfo memory headerInfo = _readHeader(_path);
         bytes32[] memory resourceData = _readResource(_path);
         return headerInfo.cache.immutableFlag && resourceData.length > 0;
@@ -253,7 +199,7 @@ contract TestWTTPStorage is WTTPStorage {
     /// @notice Get the header address that would be generated for a given header
     /// @param _header The header to calculate address for
     /// @return bytes32 The header address
-    function calculateHeaderAddress(HeaderInfo memory _header) external view returns (bytes32) {
+    function calculateHeaderAddress(HeaderInfo memory _header) external pure returns (bytes32) {
         return getHeaderAddress(_header);
     }
 
@@ -299,16 +245,4 @@ contract TestWTTPStorage is WTTPStorage {
         return meta.lastModified;
     }
 
-    /// @notice Test helper to add elements to test resource array
-    /// @param _path Path of the resource
-    /// @param _dataPoint Data point address to add
-    function addToTestResource(string memory _path, bytes32 _dataPoint) external {
-        testResources[_path].push(_dataPoint);
-    }
-
-    /// @notice Test helper to clear test storage completely
-    function clearAllTestStorage() external {
-        // Note: This doesn't actually clear mappings, but provides a function to indicate clearing intent
-        // In practice, you'd need to track keys and delete them individually
-    }
 } 

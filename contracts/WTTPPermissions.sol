@@ -68,8 +68,9 @@ abstract contract WTTPPermissions is AccessControl {
     /// @dev Allows wiping all current site admin permissions by changing the role hash
     /// @param _newSiteAdmin The new role identifier to use for site administrators
     function changeSiteAdmin(bytes32 _newSiteAdmin) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        SITE_ADMIN_ROLE = _newSiteAdmin;
+        /// @dev Emits an event first to notify listeners of the change
         emit SiteAdminChanged(SITE_ADMIN_ROLE, _newSiteAdmin);
+        SITE_ADMIN_ROLE = _newSiteAdmin;
     }
 
     /// @notice Blacklists an account from all roles

@@ -75,15 +75,6 @@ abstract contract WTTPSite is WTTPStorage {
                _metadata.size == 0 && 
                _readHeader(_path).cache.immutableFlag;
     }
-
-    /// @notice Updates the default header for the site
-    /// @dev Only site admins can modify the default header
-    /// @param _header New default header information
-    function _updateDefaultHeader(
-        HeaderInfo memory _header
-    ) external virtual onlyRole(SITE_ADMIN_ROLE) {
-        _setDefaultHeader(_header);
-    }
     
     /// @notice Determines if a method is allowed for a specific resource
     /// @dev Considers method type, user role, and resource permissions

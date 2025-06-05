@@ -66,14 +66,6 @@ contract TestWTTPPermissions is WTTPPermissions {
         return DEFAULT_ADMIN_ROLE;
     }
 
-    /// @notice Simulate the logic inside changeSiteAdmin for testing
-    /// @param _newSiteAdmin The new role identifier to simulate
-    /// @return bytes32 The current SITE_ADMIN_ROLE that would be changed
-    function simulateChangeSiteAdmin(bytes32 _newSiteAdmin) external view returns (bytes32) {
-        // Return what the old SITE_ADMIN_ROLE was before the change
-        return SITE_ADMIN_ROLE;
-    }
-
     /// @notice Test the internal hasRole logic without calling the public function
     /// @param role The role identifier to check
     /// @param account The address to check for the role
