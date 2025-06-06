@@ -224,7 +224,7 @@ describe("05 - WTTP Site Security Audit & Comprehensive Testing", function () {
         data: {
           cors: {
             origins: Array(9).fill(publicRole),
-            methods: 71, // HEAD, GET, POST, OPTIONS allowed (binary: 1000111)
+            methods: 71, // Only HEAD, GET, POST, OPTIONS allowed
             preset: 0,
             custom: ""
           },
@@ -471,14 +471,7 @@ describe("05 - WTTP Site Security Audit & Comprehensive Testing", function () {
     it("should handle immutable resource modification attempts", async function () {
       const immutablePath = "/immutable-test";
       
-      // First create the resource with content, then make it immutable
-      await testWTTPSite.connect(user1).PUT({
-        head: { path: immutablePath, ifModifiedSince: 0, ifNoneMatch: ethers.ZeroHash },
-        properties: { mimeType: "0x0000", charset: "0x0000", encoding: "0x0000", language: "0x0000" },
-        data: [{ data: ethers.toUtf8Bytes("immutable content"), chunkIndex: 0, publisher: user1.address }]
-      });
-      
-      // Now define the resource as immutable
+      // Create immutable resource
       await testWTTPSite.connect(owner).DEFINE({
         head: { path: immutablePath, ifModifiedSince: 0, ifNoneMatch: ethers.ZeroHash },
         data: {
@@ -492,6 +485,13 @@ describe("05 - WTTP Site Security Audit & Comprehensive Testing", function () {
           redirect: { code: 0, location: "" }
         }
       });
+      
+      const putResult = await testWTTPSite.connect(user1).PUT({
+        head: { path: immutablePath, ifModifiedSince: 0, ifNoneMatch: ethers.ZeroHash },
+        properties: { mimeType: "0x0000", charset: "0x0000", encoding: "0x0000", language: "0x0000" },
+        data: [{ data: ethers.toUtf8Bytes("immutable content"), chunkIndex: 0, publisher: user1.address }]
+      });
+      await putResult.wait();
       
       // Attempt to modify immutable resource should fail
       await expect(

@@ -384,12 +384,14 @@ describe("01 - WTTP Contract Deployment Tests", function () {
         range: { start: 0, end: 0 }
       };
       
-      const headResponse = await testWTTPSite.testHEAD(headRequest, getMethod);
-      expect(Number(headResponse.status)).to.equal(404); // Convert BigInt to number
+      await expect(
+        testWTTPSite.testHEAD(headRequest, getMethod)
+      ).to.be.revertedWithCustomError(testWTTPSite, "_404");
       
       // Test LOCATE method
-      const locateResponse = await testWTTPSite.testLOCATE(headRequest, getMethod);
-      expect(Number(locateResponse.head.status)).to.equal(404); // Convert BigInt to number
+      await expect(
+        testWTTPSite.testLOCATE(headRequest, getMethod)
+      ).to.be.revertedWithCustomError(testWTTPSite, "_404");
     });
   });
 
