@@ -92,13 +92,7 @@ abstract contract WTTPStorage is WTTPPermissions {
         HeaderInfo memory _header
     ) internal virtual returns (bytes32 headerAddress) {
         headerAddress = getHeaderAddress(_header);
-
-        if (header[headerAddress].cors.origins.length == 0) {
-            if (_header.cors.origins.length != uint8(type(Method).max) + 1) {
-                revert InvalidHeader(_header);
-            }
-            header[headerAddress] = _header;
-        }
+        _updateHeader(headerAddress, _header);
     }
 
     /// @notice Retrieves header information by its address
@@ -111,6 +105,23 @@ abstract contract WTTPStorage is WTTPPermissions {
         return header[_readMetadata(_path).header];
     }
 
+    function _updateHeader(bytes32 _headerAddress, HeaderInfo memory _header) internal virtual {
+        if (_header.cors.methods == 0) {
+            _header.cors.methods = MAX_METHODS;
+        } else if (_header.cors.methods > MAX_METHODS) {
+            revert InvalidHeader(_header);
+        }
+        uint256 _origins = _header.cors.origins.length;
+        if (_origins == 0) {
+            for (uint8 i = 0; i < _origins; i++) {
+                _header.cors.origins[i] = PUBLIC_ROLE;
+            }
+        } else if (_origins != uint8(type(Method).max) + 1) {
+            revert InvalidHeader(_header);
+        }
+        header[_headerAddress] = _header;
+    }
+
     // was debating on using a _readHeaderByAddress function, but decided against it
     // we don't need this since a HEAD response includes both the header address and the HeaderInfo
     // do we need to get HeaderInfo from a header address?
@@ -119,10 +130,7 @@ abstract contract WTTPStorage is WTTPPermissions {
     /// @dev Default header is stored at bytes32(0)
     /// @param _header The header information to use as default
     function _setDefaultHeader(HeaderInfo memory _header) internal virtual {
-        if (_header.cors.origins.length != uint8(type(Method).max) + 1) {
-            revert InvalidHeader(_header);
-        }
-        header[bytes32(0)] = _header;
+        _updateHeader(bytes32(0), _header);
     }
 
     /// @notice Updates the default header information
@@ -154,7 +162,13 @@ abstract contract WTTPStorage is WTTPPermissions {
     function _updateMetadataStats(string memory _path) internal virtual {
         // set calculated values
         metadata[_path].lastModified = block.timestamp;
-        metadata[_path].version++;
+        if (resource[_path].length > 0) {
+            metadata[_path].version++;
+        } else {
+            if (metadata[_path].version > 0) {
+                metadata[_path].version++;
+            }
+        }
 
         emit MetadataUpdated(_path);
     }
@@ -197,8 +211,7 @@ abstract contract WTTPStorage is WTTPPermissions {
     function _resourceExists(
         string memory _path
     ) internal virtual view returns (bool) {
-        ResourceMetadata memory _metadata = _readMetadata(_path);
-        return _metadata.size > 0 && _metadata.version > 0;
+        return _readMetadata(_path).lastModified > 0;
     }
     
     /// @notice Creates a new data point for a resource
@@ -253,8 +266,8 @@ abstract contract WTTPStorage is WTTPPermissions {
             // Calculate size delta (new size - old size)
             metadata[_path].size = 
                 metadata[_path].size 
-                - DPS().dataPointSize(resource[_path][_chunkIndex]) 
-                + DPS().dataPointSize(_dataPointAddress);
+                + DPS().dataPointSize(_dataPointAddress)
+                - DPS().dataPointSize(resource[_path][_chunkIndex]);
             resource[_path][_chunkIndex] = _dataPointAddress;
         }
 
@@ -271,6 +284,7 @@ abstract contract WTTPStorage is WTTPPermissions {
         delete resource[_path];
         metadata[_path].size = 0;
         _deleteMetadata(_path);
+        metadata[_path].lastModified = 0;
         emit ResourceDeleted(_path);
     }
 

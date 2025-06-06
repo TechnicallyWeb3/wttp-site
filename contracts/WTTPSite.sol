@@ -24,8 +24,12 @@ abstract contract WTTPSite is WTTPStorage {
     /// @dev Reads from the resource's header to get admin role identifier
     /// @param _path Resource path to check
     /// @return bytes32 The resource admin role identifier
-    function _getAuthorizedRole(string memory _path, Method _method) internal view returns (bytes32) {   
-        return _readHeader(_path).cors.origins[uint256(_method)];
+    function _getAuthorizedRole(string memory _path, Method _method) internal view returns (bytes32) {
+        bytes32[] memory _origins = _readHeader(_path).cors.origins;
+        if (_origins.length == 0) {
+            return DEFAULT_ADMIN_ROLE; // default to site admin if no origins are set
+        }
+        return _origins[uint256(_method)];
     }
 
     /// @notice Checks if an account has admin rights for a specific resource
@@ -47,22 +51,30 @@ abstract contract WTTPSite is WTTPStorage {
     /// @param _path Resource path being accessed
     modifier onlyAuthorized(string memory _path, Method _method) {
         if (!_methodAllowed(_path, _method)) {
-            revert _405(msg.sender, _method, _path);
+            revert _405(msg.sender, _readHeader(_path).cors.methods, _path);
         }
         if (!_isAuthorized(_path, _method, msg.sender)) {
             revert _403(msg.sender, _getAuthorizedRole(_path, _method), _path);
         }
         _;
     }
+    // function _authorize(string memory _path, Method _method) internal view 
+    // onlyAuthorized(_path, _method) returns (bool) {
+    //     return true;
+    // }
 
     modifier resourceExists(string memory _path) {
         if (!_resourceExists(_path)) {
-            if (_resourceGone(_path)) {
-                revert _410(_path);
-            }
             revert _404(_path);
         }
+        if (_resourceGone(_path)) {
+            revert _410(_path);
+        }
         _;
+    }
+
+    function _exists(string memory _path) internal view resourceExists(_path) returns (bool) {
+        return true;
     }
 
     /// @notice Checks if a resource was previously deleted
@@ -75,16 +87,23 @@ abstract contract WTTPSite is WTTPStorage {
                _metadata.size == 0 && 
                _readHeader(_path).cache.immutableFlag;
     }
-    
+
+    function _resourceImmutable(string memory _path) internal view returns (bool) {
+        return _readHeader(_path).cache.immutableFlag;
+    }
+
     /// @notice Determines if a method is allowed for a specific resource
     /// @dev Considers method type, user role, and resource permissions
     /// @param _path Resource path to check
     /// @param _method Method type being requested
     /// @return bool True if the method is allowed
     function _methodAllowed(string memory _path, Method _method) internal view returns (bool) {
-        uint16 methodBit = uint16(1 << uint8(_method)); // Create a bitmask for the method
-        bool _allowed = _readHeader(_path).cors.methods & methodBit != 0;
-        return _allowed;
+        // super admins can do anything, needed to fix potential site bricking issues
+        if (hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
+            return true;
+        }
+        
+        return _readHeader(_path).cors.methods & uint16(1 << uint8(_method)) != 0;
     }
 
     /// @notice Internal implementation of OPTIONS method
@@ -97,13 +116,13 @@ abstract contract WTTPSite is WTTPStorage {
         Method _method
     ) internal view onlyAuthorized(_path, _method) returns (OPTIONSResponse memory optionsResponse) {
         uint16 _code = 500;
-        if (!_methodAllowed(_path, _method)) {
-            _code = 405; // Method Not Allowed
-        } else if (_method == Method.OPTIONS) {
-            optionsResponse.allow = _readHeader(_path).cors.methods;
+        if (_method == Method.OPTIONS) {
             _code = 204; // No Content
         }
-        optionsResponse.status = _code;
+        optionsResponse = OPTIONSResponse({
+            status: _code,
+            allow: _readHeader(_path).cors.methods
+        });
     }
 
     /// @notice Handles OPTIONS requests to check available methods
@@ -126,18 +145,16 @@ abstract contract WTTPSite is WTTPStorage {
     ) internal view returns (HEADResponse memory headResponse) {
         string memory _path = headRequest.path;
         uint16 _code = _OPTIONS(_path, _method).status;
-
+        if (!(_method == Method.PUT || _method == Method.DEFINE)) {
+            _exists(_path);
+        }
         if (_code == 500) {
             ResourceMetadata memory _metadata = _readMetadata(_path);
             HeaderInfo memory _headerInfo = _readHeader(_path);
             bytes32 _etag = calculateEtag(_metadata, _readResource(_path));
             uint16 _redirectCode = _headerInfo.redirect.code;
         
-            if (!_resourceExists(_path)) {
-                _code = 404; // Not Found
-            } 
-            // 3xx codes - conditional responses
-            else if (
+            if (
                 _etag == headRequest.ifNoneMatch || 
                 headRequest.ifModifiedSince > _metadata.lastModified
             ) {
@@ -166,8 +183,9 @@ abstract contract WTTPSite is WTTPStorage {
     /// @return head Response with header and metadata information
     function HEAD(
         HEADRequest memory headRequest
-    ) external view resourceExists(headRequest.path) returns (HEADResponse memory head) {
-        return _HEAD(headRequest, Method.HEAD);
+    ) external view 
+    returns (HEADResponse memory head) {
+        head = _HEAD(headRequest, Method.HEAD);
     }
 
     /// @notice Internal implementation of LOCATE method
@@ -192,18 +210,17 @@ abstract contract WTTPSite is WTTPStorage {
     /// @return locateResponse Response containing storage locations
     function LOCATE(
         HEADRequest memory locateRequest
-    ) external view resourceExists(locateRequest.path) returns (LOCATEResponse memory locateResponse) {
+    ) external view returns (LOCATEResponse memory locateResponse) {
         return _LOCATE(locateRequest, Method.LOCATE);
     }
 
-    /// @notice Handles GET requests to retrieve resources
-    /// @dev Equivalent to LOCATE in this implementation (actual data retrieval happens off-chain)
+    /// @notice Handles GET requests to retrieve resource content locations
     /// @param getRequest Request information
-    /// @return getResponse Response containing metadata and data point addresses
+    /// @return locateResponse Response containing resource and storage locations
     function GET(
-        HEADRequest memory getRequest
-    ) external view resourceExists(getRequest.path) returns (LOCATEResponse memory getResponse) {
-        return _LOCATE(getRequest, Method.GET);
+        LOCATERequest memory getRequest
+    ) external view returns (LOCATEResponse memory locateResponse) {
+        return _LOCATE(getRequest.head, Method.GET);
     }
 
     /// @notice Handles DEFINE requests to update resource headers
@@ -217,10 +234,7 @@ abstract contract WTTPSite is WTTPStorage {
         uint16 _code = _headResponse.status;
         bytes32 _headerAddress;
 
-        if (
-            _code == 404 ||
-            _code == 500
-        ) {
+        if (_code == 500) {
             _headerAddress = _createHeader(defineRequest.data);
             ResourceMetadata memory _metadata = _readMetadata(defineRequest.head.path);
             _updateMetadata(defineRequest.head.path, ResourceMetadata({
@@ -246,7 +260,7 @@ abstract contract WTTPSite is WTTPStorage {
     /// @return deleteResponse Response confirming deletion
     function DELETE(
         HEADRequest memory deleteRequest
-    ) external resourceExists(deleteRequest.path) returns (HEADResponse memory deleteResponse) {
+    ) external returns (HEADResponse memory deleteResponse) {
         deleteResponse = _HEAD(deleteRequest, Method.DELETE);
         if (deleteResponse.status == 500) {
             _deleteResource(deleteRequest.path);
@@ -262,15 +276,14 @@ abstract contract WTTPSite is WTTPStorage {
     /// @return putResponse Response containing created resource information
     function PUT(
         PUTRequest memory putRequest
-    ) external payable onlyAuthorized(putRequest.head.path, Method.PUT) 
-    returns (LOCATEResponse memory putResponse) {
+    ) external payable returns (LOCATEResponse memory putResponse) {
         HEADResponse memory _headResponse = _HEAD(putRequest.head, Method.PUT);
         uint16 _code = _headResponse.status;
+        string memory _path = putRequest.head.path;
+        
         if (
-            _code == 404 ||
             _code == 500
         ) {
-            string memory _path = putRequest.head.path;
             bool resourceExisted = _resourceExists(_path);
             if (resourceExisted) _deleteResource(_path); // delete any existing resource
             _updateMetadata(
@@ -292,6 +305,7 @@ abstract contract WTTPSite is WTTPStorage {
             _headResponse.status = _code;
         }
         putResponse.head = _headResponse;
+        putResponse.dataPoints = _readResource(_path);
 
         emit PUTSuccess(msg.sender, putResponse);
     }
@@ -302,8 +316,7 @@ abstract contract WTTPSite is WTTPStorage {
     /// @return patchResponse Response containing updated resource information
     function PATCH(
         PATCHRequest memory patchRequest
-    ) external payable onlyAuthorized(patchRequest.head.path, Method.PATCH) 
-    returns (LOCATEResponse memory patchResponse) {
+    ) external payable returns (LOCATEResponse memory patchResponse) {
         HEADResponse memory _headResponse = _HEAD(patchRequest.head, Method.PATCH);
 
         if (

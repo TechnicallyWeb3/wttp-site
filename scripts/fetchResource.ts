@@ -47,7 +47,17 @@ export async function fetchResourceFromSite(
 
   // For GET requests, use the site's GET method which returns LOCATEResponse
   console.log(`Fetching resource at ${path} from site ${siteAddress}`);
-  const locateResponse = await siteContract.GET(headRequest_obj);
+  
+  // Create LOCATERequest with HEADRequest and range for chunked requests
+  const locateRequest = {
+    head: headRequest_obj,
+    rangeChunks: {
+      start: 0,  // Start from first chunk
+      end: 0     // 0 means to end
+    }
+  };
+  
+  const locateResponse = await siteContract.GET(locateRequest);
   
   // Updated to use new response structure without responseLine wrapper
   console.log(`Response status: ${locateResponse.head.status}`);

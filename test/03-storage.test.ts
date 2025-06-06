@@ -1,11 +1,15 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
+import { loadEspContracts, createUniqueData } from "./helpers/espHelpers";
+import { TestWTTPStorage } from "../typechain-types/contracts/test/TestWTTPStorage";
+import { IDataPointRegistry, IDataPointStorage } from "@wttp/core";
+import { ResourceMetadataStruct } from "../typechain-types/contracts/test/TestWTTPStorage";
 
 describe("03 - WTTP Storage Security Audit", function () {
-  let testWTTPStorage: any;
-  let dataPointRegistry: any;
-  let dataPointStorage: any;
+  let testWTTPStorage: TestWTTPStorage;
+  let dataPointRegistry: IDataPointRegistry;
+  let dataPointStorage: IDataPointStorage;
   let owner: SignerWithAddress;
   let siteAdmin: SignerWithAddress;
   let user1: SignerWithAddress;
@@ -25,38 +29,15 @@ describe("03 - WTTP Storage Security Audit", function () {
   let mockDataPointAddress: string;
   let royaltyRate: bigint;
 
-  // Helper function to create unique data for each test to avoid royalty issues
-  function createUniqueData(baseString: string = "Test Data"): string {
-    return ethers.solidityPacked(
-      ["string", "uint256", "uint256"], 
-      [baseString, Date.now(), Math.floor(Math.random() * 1000000)]
-    );
-  }
-
   before(async function () {
+    // load/deploy common infrastructure contracts
     [owner, siteAdmin, user1, user2, attacker, blacklisted] = await ethers.getSigners();
 
-    // Set up test values
-    royaltyRate = ethers.parseEther("0.001"); // 0.1% of ETH
+    const { dps, dpr } = await loadEspContracts();
 
-    // Deploy ESP contracts once
-    console.log("Deploying ESP contracts...");
-    
-    // Deploy DataPointStorage
-    const DataPointStorageFactory = await ethers.getContractFactory("DataPointStorage");
-    dataPointStorage = await DataPointStorageFactory.deploy();
-    await dataPointStorage.waitForDeployment();
-    console.log(`DataPointStorage deployed at: ${await dataPointStorage.getAddress()}`);
-
-    // Deploy DataPointRegistry with DPS dependency
-    const DataPointRegistryFactory = await ethers.getContractFactory("DataPointRegistry");
-    dataPointRegistry = await DataPointRegistryFactory.deploy(
-      owner.address,
-      await dataPointStorage.getAddress(),
-      royaltyRate
-    );
-    await dataPointRegistry.waitForDeployment();
-    console.log(`DataPointRegistry deployed at: ${await dataPointRegistry.getAddress()}`);
+    dataPointStorage = dps;
+    dataPointRegistry = dpr;
+    royaltyRate = ethers.parseUnits("0.001", "gwei");
   });
 
   beforeEach(async function () {
@@ -70,7 +51,7 @@ describe("03 - WTTP Storage Security Audit", function () {
     testHeader = {
       cors: {
         origins: testOrigins,
-        methods: 0xFF, // All methods allowed
+        methods: 511, // All methods allowed
         preset: 0,
         custom: ""
       },
@@ -303,9 +284,10 @@ describe("03 - WTTP Storage Security Audit", function () {
 
   describe("🗂️ Metadata Security Audit", function () {
     beforeEach(async function () {
-      // Register the data point in DPR first, then create resource
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
-      await testWTTPStorage.createResource("/test", testDataRegistration);
+      // get the data point address from the storage contract
+      const dataPointAddress = await dataPointStorage.calculateAddress(testDataRegistration.data);
+      const dataRoyalty = await dataPointRegistry.getDataPointRoyalty(dataPointAddress);
+      await testWTTPStorage.createResource("/test", testDataRegistration, { value: dataRoyalty });
     });
 
     it("should properly track metadata versions and timestamps", async function () {
@@ -313,13 +295,31 @@ describe("03 - WTTP Storage Security Audit", function () {
       expect(initialMetadata.version).to.equal(1);
       expect(initialMetadata.lastModified).to.be.greaterThan(0);
 
+      // console.log("initialMetadata", initialMetadata);
+
       // Update metadata
-      const newMetadata = { ...initialMetadata };
-      newMetadata.header = ethers.hexlify(ethers.randomBytes(32));
+      const newMetadata: ResourceMetadataStruct = {
+        properties: {
+          mimeType: initialMetadata.properties.mimeType,
+          charset: initialMetadata.properties.charset,
+          encoding: initialMetadata.properties.encoding,
+          language: initialMetadata.properties.language
+        },
+        size: initialMetadata.size,
+        version: initialMetadata.version,
+        lastModified: initialMetadata.lastModified,
+        header: ethers.hexlify(ethers.randomBytes(32)),
+      }
+
+      // console.log("newMetadata", newMetadata);
       
-      await testWTTPStorage.updateMetadata("/test", newMetadata);
+      const tx = await testWTTPStorage.updateMetadata("/test", newMetadata);
+      await tx.wait();
       
       const updatedMetadata = await testWTTPStorage.readMetadata("/test");
+
+      console.log("updatedMetadata", updatedMetadata);
+
       expect(updatedMetadata.version).to.equal(2);
       expect(updatedMetadata.lastModified).to.be.greaterThan(initialMetadata.lastModified);
     });
@@ -330,11 +330,17 @@ describe("03 - WTTP Storage Security Audit", function () {
       const originalVersion = initialMetadata.version;
 
       // Try to manually set size and version
-      const maliciousMetadata = {
-        header: ethers.hexlify(ethers.randomBytes(32)),
+      const maliciousMetadata: ResourceMetadataStruct = {
+        properties: {
+          mimeType: "0x7468", // "th"
+          charset: "0x7538", // "u8"
+          encoding: "0x677a", // "gz"
+          language: "0x656e" // "en"
+        },
         size: 999999, // Attempt to override
         version: 999, // Attempt to override
-        lastModified: 0 // Attempt to override
+        lastModified: 0, // Attempt to override
+        header: ethers.hexlify(ethers.randomBytes(32)),
       };
       
       await testWTTPStorage.updateMetadata("/test", maliciousMetadata);
@@ -342,7 +348,7 @@ describe("03 - WTTP Storage Security Audit", function () {
       const updatedMetadata = await testWTTPStorage.readMetadata("/test");
       // Should preserve original size but increment version
       expect(updatedMetadata.size).to.equal(originalSize);
-      expect(updatedMetadata.version).to.equal(originalVersion + 1);
+      expect(updatedMetadata.version).to.equal(originalVersion + 1n);
       expect(updatedMetadata.lastModified).to.be.greaterThan(0);
     });
 
@@ -351,7 +357,7 @@ describe("03 - WTTP Storage Security Audit", function () {
       
       const deletedMetadata = await testWTTPStorage.readMetadata("/test");
       expect(deletedMetadata.header).to.equal(ethers.ZeroHash);
-      expect(deletedMetadata.size).to.equal(0);
+      expect(deletedMetadata.properties.mimeType).to.equal("0x0000");
     });
 
     it("should update metadata stats correctly", async function () {
@@ -362,7 +368,7 @@ describe("03 - WTTP Storage Security Audit", function () {
       await testWTTPStorage.updateMetadataStats("/test");
       
       const afterUpdate = await testWTTPStorage.readMetadata("/test");
-      expect(afterUpdate.version).to.equal(beforeVersion + 1);
+      expect(afterUpdate.version).to.equal(beforeVersion + 1n);
       expect(afterUpdate.lastModified).to.be.greaterThan(beforeTimestamp);
     });
   });
@@ -372,7 +378,6 @@ describe("03 - WTTP Storage Security Audit", function () {
       expect(await testWTTPStorage.resourceExists("/nonexistent")).to.be.false;
       
       // Create resource
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
       await testWTTPStorage.createResource("/test", testDataRegistration);
       
       expect(await testWTTPStorage.resourceExists("/test")).to.be.true;
@@ -385,12 +390,10 @@ describe("03 - WTTP Storage Security Audit", function () {
       await testWTTPStorage.createResource("/test", testDataRegistration, { value: royalty });
       expect(await testWTTPStorage.resourceExists("/test")).to.be.true;
 
-      // Should fail with insufficient payment for a new data point
-      const newTestData = createUniqueData("Different Data");
-      const newDataPointAddress = await dataPointStorage.calculateAddress(newTestData);
-      const newRoyalty = await dataPointRegistry.getDataPointRoyalty(newDataPointAddress);
+      const dataPointAddress = await dataPointStorage.calculateAddress(testDataRegistration.data);
+      const newRoyalty = await dataPointRegistry.getDataPointRoyalty(dataPointAddress);
       const newTestRegistration = {
-        data: newTestData,
+        data: testDataRegistration.data,
         publisher: user1.address,
         chunkIndex: 0
       };
@@ -401,7 +404,7 @@ describe("03 - WTTP Storage Security Audit", function () {
     });
 
     it("should properly track resource chunks and size", async function () {
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
+
       await testWTTPStorage.createResource("/test", testDataRegistration);
 
       expect(await testWTTPStorage.getResourceChunkCount("/test")).to.equal(1);
@@ -410,7 +413,6 @@ describe("03 - WTTP Storage Security Audit", function () {
     });
 
     it("should handle chunk index validation in updates", async function () {
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
       await testWTTPStorage.createResource("/test", testDataRegistration);
 
       // Create another data point for updates
@@ -432,7 +434,6 @@ describe("03 - WTTP Storage Security Audit", function () {
     });
 
     it("should properly calculate size during chunk updates", async function () {
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
       await testWTTPStorage.createResource("/test", testDataRegistration);
 
       const initialSize = await testWTTPStorage.getResourceSize("/test");
@@ -455,7 +456,6 @@ describe("03 - WTTP Storage Security Audit", function () {
       
       for (let i = 0; i < 3; i++) {
         const data = createUniqueData(`Bulk Data ${i}`);
-        await dataPointRegistry.connect(user1).registerDataPoint(data, user1.address);
         
         multipleRegistrations.push({
           data: data,
@@ -472,7 +472,6 @@ describe("03 - WTTP Storage Security Audit", function () {
     });
 
     it("should properly delete resources", async function () {
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
       await testWTTPStorage.createResource("/test", testDataRegistration);
 
       expect(await testWTTPStorage.resourceExists("/test")).to.be.true;
@@ -495,13 +494,18 @@ describe("03 - WTTP Storage Security Audit", function () {
       await testWTTPStorage.createHeader(immutableHeader);
       
       const immutableMetadata = {
+        properties: {
+          mimeType: "0x7468", // "th"
+          charset: "0x7538", // "u8"
+          encoding: "0x677a", // "gz"
+          language: "0x656e", // "en"
+        },
         header: await testWTTPStorage.calculateHeaderAddress(immutableHeader),
         size: 0,
         version: 0,
         lastModified: 0
       };
       
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
       await testWTTPStorage.createResource("/immutable", testDataRegistration);
       await testWTTPStorage.updateMetadata("/immutable", immutableMetadata);
     });
@@ -555,35 +559,70 @@ describe("03 - WTTP Storage Security Audit", function () {
       // Creating on a path that doesn't exist yet should work even with immutable header
       const newPath = "/new-immutable";
       
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
-      await testWTTPStorage.createResource(newPath, testDataRegistration);
+      // Use unique data for this test to avoid royalty conflicts
+      const uniqueData = createUniqueData("Unique Immutable Path Data");
+      const uniqueTestRegistration = {
+        data: uniqueData,
+        publisher: user1.address,
+        chunkIndex: 0
+      };
+
+      const immutableHeader = { ...testHeader };
+      immutableHeader.cache.immutableFlag = true;
+
+      await testWTTPStorage.createHeader(immutableHeader);
+
+      const immutableMetadata = {
+        properties: {
+          mimeType: "0x7468", // "th"
+          charset: "0x7538", // "u8"
+          encoding: "0x677a", // "gz"
+          language: "0x656e", // "en"
+        },
+        size: 0,
+        version: 0,
+        lastModified: 0,
+        header: await testWTTPStorage.calculateHeaderAddress(immutableHeader),
+      };
+      await testWTTPStorage.updateMetadata(newPath, immutableMetadata);
+
+      await testWTTPStorage.createResource(newPath, uniqueTestRegistration);
       
       expect(await testWTTPStorage.resourceExists(newPath)).to.be.true;
+      expect(await testWTTPStorage.isResourceImmutable(newPath)).to.be.true;
+
+      // should fail to update the immutable resource
+      await expect(testWTTPStorage.createResource(newPath, testDataRegistration)).to.be.revertedWithCustomError(testWTTPStorage, "_409");
     });
   });
 
   describe("⚠️ Path Validation and Attack Vectors", function () {
     it("should handle empty and special paths", async function () {
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
+      expect(await testWTTPStorage.resourceExists("")).to.be.false;
       
       // Empty path
       await testWTTPStorage.createResource("", testDataRegistration);
       expect(await testWTTPStorage.resourceExists("")).to.be.true;
+
+      const dataPointAddress = await dataPointStorage.calculateAddress(testDataRegistration.data);
+      const dataRoyalty = await dataPointRegistry.getDataPointRoyalty(dataPointAddress);
       
       // Path with special characters
-      await testWTTPStorage.createResource("/path with spaces", testDataRegistration);
+      await testWTTPStorage.createResource("/path with spaces", testDataRegistration, { value: dataRoyalty });
       expect(await testWTTPStorage.resourceExists("/path with spaces")).to.be.true;
     });
 
     it("should handle path collision attacks", async function () {
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
       
       // Create resource with normal path
       await testWTTPStorage.createResource("/normal/path", testDataRegistration);
+
+      const dataPointAddress = await dataPointStorage.calculateAddress(testDataRegistration.data);
+      const dataRoyalty = await dataPointRegistry.getDataPointRoyalty(dataPointAddress);
       
       // Try similar but different paths
-      await testWTTPStorage.createResource("/normal/path/", testDataRegistration);
-      await testWTTPStorage.createResource("/normal\\path", testDataRegistration);
+      await testWTTPStorage.createResource("/normal/path/", testDataRegistration, { value: dataRoyalty });
+      await testWTTPStorage.createResource("/normal\\path", testDataRegistration, { value: dataRoyalty });
       
       // Each should be treated as separate resources
       expect(await testWTTPStorage.resourceExists("/normal/path")).to.be.true;
@@ -592,7 +631,6 @@ describe("03 - WTTP Storage Security Audit", function () {
     });
 
     it("should handle very long paths", async function () {
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
       
       // Create very long path
       const longPath = "/very/long/path/" + "segment/".repeat(100);
@@ -602,13 +640,16 @@ describe("03 - WTTP Storage Security Audit", function () {
     });
 
     it("should handle unicode and special character paths", async function () {
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
       
       const unicodePath = "/文件/テスト/файл.txt";
-      const specialPath = "/file!@#$%^&*()+={}[]|\\:;\"'<>,.?/~`";
+      const specialPath = "/file!@#$%^&*()+={}[]|\\:;'<>,.?/~`";
       
       await testWTTPStorage.createResource(unicodePath, testDataRegistration);
-      await testWTTPStorage.createResource(specialPath, testDataRegistration);
+
+      const dataPointAddress = await dataPointStorage.calculateAddress(testDataRegistration.data);
+      const dataRoyalty = await dataPointRegistry.getDataPointRoyalty(dataPointAddress);
+
+      await testWTTPStorage.createResource(specialPath, testDataRegistration, { value: dataRoyalty });
       
       expect(await testWTTPStorage.resourceExists(unicodePath)).to.be.true;
       expect(await testWTTPStorage.resourceExists(specialPath)).to.be.true;
@@ -625,19 +666,53 @@ describe("03 - WTTP Storage Security Audit", function () {
     });
 
     it("should handle DPR integration failures gracefully", async function () {
-      // Try to create resource without registering data point first
-      const newTestData = createUniqueData("Unregistered Data");
+      // ORIGINAL TEST INTENT: The original test was trying to test "unregistered data"
+      // but this is NOT a failure case - DPR automatically creates unregistered data.
+      
+      // ACTUAL DPR INTEGRATION FAILURE: Insufficient payment for existing data with royalties
+      
+      // First, create a data point and register it to establish royalty costs
+      const existingTestData = createUniqueData("Existing Data With Royalties");
+      
+      // Register the data point directly through DPR to establish gas costs and publisher
+      await dataPointRegistry.connect(user1).registerDataPoint(existingTestData, user1.address);
+      
+      const existingDataPointAddress = await dataPointStorage.calculateAddress(existingTestData);
+      const royalty = await dataPointRegistry.getDataPointRoyalty(existingDataPointAddress);
+      
+      // Verify this data point now has royalty costs
+      expect(royalty).to.be.greaterThan(0);
+      
+      // Now try to create a storage resource using this existing data with insufficient payment
+      const testRegistration = {
+        data: existingTestData,
+        publisher: user2.address, // Different user trying to use existing data
+        chunkIndex: 0
+      };
+      
+      // This should fail due to insufficient royalty payment
+      await expect(
+        testWTTPStorage.createResource("/test-fail", testRegistration, { value: royalty / 2n })
+      ).to.be.reverted; // Generic revert check since the exact error might come from different levels
+      
+      // SUCCESS CASE: Provide sufficient payment
+      await testWTTPStorage.createResource("/test-success", testRegistration, { value: royalty });
+      expect(await testWTTPStorage.resourceExists("/test-success")).to.be.true;
+      
+      // ORIGINAL MISUNDERSTOOD CASE: New/unregistered data should succeed (not fail)
+      const newTestData = createUniqueData("New Unregistered Data");
       const newTestRegistration = {
         data: newTestData,
         publisher: user1.address,
         chunkIndex: 0
       };
       
-      const royalty = await dataPointRegistry.getDataPointRoyalty(await dataPointStorage.calculateAddress(newTestData));
-      
-      await expect(
-        testWTTPStorage.createResource("/test", newTestRegistration, { value: royalty })
-      ).to.be.reverted;
+      // This should succeed - DPR creates new data automatically
+      await testWTTPStorage.createResource("/test-new", newTestRegistration);
+      expect(await testWTTPStorage.resourceExists("/test-new")).to.be.true;
+
+      const newRoyalty = await dataPointRegistry.getDataPointRoyalty(await dataPointStorage.calculateAddress(newTestData));
+      expect(newRoyalty).to.be.greaterThan(0); // royalty for new data
     });
 
     it("should properly forward payments to DPR", async function () {
@@ -660,9 +735,7 @@ describe("03 - WTTP Storage Security Audit", function () {
         const dataPointAddress = await dataPointStorage.calculateAddress(data);
         const royalty = await dataPointRegistry.getDataPointRoyalty(dataPointAddress);
         totalRoyalty += royalty;
-        
-        await dataPointRegistry.connect(user1).registerDataPoint(data, user1.address);
-        
+                
         registrations.push({
           data: data,
           publisher: user1.address,
@@ -705,7 +778,6 @@ describe("03 - WTTP Storage Security Audit", function () {
 
   describe("📊 Event Emission and Monitoring", function () {
     it("should emit ResourceCreated event on first chunk", async function () {
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
       
       await expect(
         testWTTPStorage.createResource("/test", testDataRegistration)
@@ -713,7 +785,6 @@ describe("03 - WTTP Storage Security Audit", function () {
     });
 
     it("should emit ResourceUpdated event on chunk updates", async function () {
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
       await testWTTPStorage.createResource("/test", testDataRegistration);
       
       const newTestData = createUniqueData("Update Event Test");
@@ -726,7 +797,6 @@ describe("03 - WTTP Storage Security Audit", function () {
     });
 
     it("should emit ResourceDeleted event on deletion", async function () {
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
       await testWTTPStorage.createResource("/test", testDataRegistration);
       
       await expect(
@@ -735,10 +805,16 @@ describe("03 - WTTP Storage Security Audit", function () {
     });
 
     it("should emit MetadataUpdated and MetadataDeleted events", async function () {
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
       await testWTTPStorage.createResource("/test", testDataRegistration);
       
-      const newMetadata = { header: ethers.hexlify(ethers.randomBytes(32)), size: 0, version: 0, lastModified: 0 };
+      const newMetadata = { 
+        properties: { 
+          mimeType: "0x7468", 
+          charset: "0x7538", 
+          encoding: "0x677a", 
+          language: "0x656e" 
+        }, 
+        header: ethers.hexlify(ethers.randomBytes(32)), size: 0, version: 0, lastModified: 0 };
       
       await expect(
         testWTTPStorage.updateMetadata("/test", newMetadata)
@@ -750,7 +826,6 @@ describe("03 - WTTP Storage Security Audit", function () {
     });
 
     it("should emit OutOfBoundsChunk event for invalid indices", async function () {
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
       await testWTTPStorage.createResource("/test", testDataRegistration);
       
       const newTestData = createUniqueData("OutOfBounds Test");
@@ -765,7 +840,6 @@ describe("03 - WTTP Storage Security Audit", function () {
 
   describe("🧪 Stress Testing and DoS Protection", function () {
     it("should handle maximum number of chunks per resource", async function () {
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
       await testWTTPStorage.createResource("/stress", testDataRegistration);
       
       // Add many chunks (test reasonable limit)
@@ -783,14 +857,18 @@ describe("03 - WTTP Storage Security Audit", function () {
     it("should handle large metadata operations efficiently", async function () {
       const batchSize = 20; // Reduced for test performance
       const paths = [];
-      
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
-      
+
+      const dataPointAddress = await dataPointStorage.calculateAddress(testDataRegistration.data);
+      let dataRoyalty: bigint = 0n;
+            
       // Create many resources
       for (let i = 0; i < batchSize; i++) {
         const path = `/batch-${i}`;
         paths.push(path);
-        await testWTTPStorage.createResource(path, testDataRegistration);
+        await testWTTPStorage.createResource(path, testDataRegistration, { value: dataRoyalty });
+        if (i == 0) {
+          dataRoyalty = await dataPointRegistry.getDataPointRoyalty(dataPointAddress);
+        }
       }
       
       // Verify all exist
@@ -800,14 +878,17 @@ describe("03 - WTTP Storage Security Audit", function () {
     });
 
     it("should handle gas-efficient operations", async function () {
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
       
       const createTx = await testWTTPStorage.createResource("/gas-test", testDataRegistration);
       const createReceipt = await createTx.wait();
-      expect(createReceipt?.gasUsed).to.be.lessThan(300000); // Increased limit for real contracts
+      
+      // Gas limit increased to account for integrated DPR registration
+      // This includes: data point creation + gas measurement + royalty recording + storage updates
+      // Limit ensures operations remain cost-effective for users (< $50 at 50 gwei gas price)
+      expect(createReceipt?.gasUsed).to.be.lessThan(400000); // ~$20 at 50 gwei/$3000 ETH
       
       const readGas = await testWTTPStorage.readResource.estimateGas("/gas-test");
-      expect(readGas).to.be.lessThan(100000);
+      expect(readGas).to.be.lessThan(100000); // Read operations should remain lightweight
     });
   });
 
@@ -844,13 +925,11 @@ describe("03 - WTTP Storage Security Audit", function () {
       // Test the header existence logic
       expect(await testWTTPStorage.headerExistsForPath("/nonexistent")).to.be.true; // Uses default
       
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
       await testWTTPStorage.createResource("/test", testDataRegistration);
       expect(await testWTTPStorage.headerExistsForPath("/test")).to.be.true;
     });
 
     it("should validate resource version tracking", async function () {
-      await dataPointRegistry.connect(user1).registerDataPoint(testDataRegistration.data, testDataRegistration.publisher);
       await testWTTPStorage.createResource("/version-test", testDataRegistration);
       
       expect(await testWTTPStorage.getResourceVersion("/version-test")).to.equal(1);

@@ -3,14 +3,20 @@ import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import fs from "fs";
 import path from "path";
-import * as espDeployments from "@tw3/esp";
+import * as esp from "@tw3/esp";
 
 // Import types and interfaces from @wttp/core
 import {
-  HeaderInfoStruct,
+  type HeaderInfoStruct,
   type IDataPointStorage,
   type IDataPointRegistry
 } from "@wttp/core";
+
+import { TestWTTPPermissions } from "../typechain-types/contracts/test/TestWTTPPermissions";
+import { TestWTTPStorage } from "../typechain-types/contracts/test/TestWTTPStorage";
+import { TestWTTPSite } from "../typechain-types/contracts/test/TestWTTPSite";
+import { Web3Site } from "../typechain-types/contracts/test/Web3Site";
+import { loadEspContracts } from "./helpers/espHelpers";
 
 // Local contract types will be inferred from ethers.getContractFactory
 
@@ -20,12 +26,12 @@ describe("01 - WTTP Contract Deployment Tests", function () {
   let user2: SignerWithAddress;
   
   // Contract instances - using any for locally compiled contracts
-  let dataPointStorage: any;
-  let dataPointRegistry: any;
-  let testWTTPPermissions: any;
-  let testWTTPStorage: any;
-  let testWTTPSite: any;
-  let web3Site: any;
+  let dataPointStorage: IDataPointStorage;
+  let dataPointRegistry: IDataPointRegistry;
+  let testWTTPPermissions: TestWTTPPermissions;
+  let testWTTPStorage: TestWTTPStorage;
+  let testWTTPSite: TestWTTPSite;
+  let web3Site: Web3Site;
   
   // Default values for testing
   let defaultHeader: HeaderInfoStruct;
@@ -36,10 +42,7 @@ describe("01 - WTTP Contract Deployment Tests", function () {
     [owner, user1, user2] = await ethers.getSigners();
     
     // Set up default values
-    royaltyRate = ethers.parseEther("0.001"); // 0.1% of ETH
-    
-    // Method enum has values 0-8 (9 total), so origins array needs 9 elements
-    const publicRole = ethers.zeroPadBytes("0x", 32); // Use zero role for public access
+    royaltyRate = ethers.parseUnits("0.001", "gwei"); // 1000000 wei
     
     defaultHeader = {
       cache: {
@@ -49,17 +52,7 @@ describe("01 - WTTP Contract Deployment Tests", function () {
       },
       cors: {
         methods: 31, // Allow GET, POST, PUT, DELETE, HEAD
-        origins: [
-          publicRole, // HEAD (0)
-          publicRole, // GET (1)
-          publicRole, // POST (2)
-          publicRole, // PUT (3)
-          publicRole, // PATCH (4)
-          publicRole, // DELETE (5)
-          publicRole, // OPTIONS (6)
-          publicRole, // LOCATE (7)
-          publicRole  // DEFINE (8)
-        ],
+        origins: [], // *
         preset: 0,
         custom: ""
       },
@@ -68,6 +61,9 @@ describe("01 - WTTP Contract Deployment Tests", function () {
         location: ""
       }
     };
+    const { dps, dpr } = await loadEspContracts();
+    dataPointStorage = dps;
+    dataPointRegistry = dpr;
   });
 
   describe("ESP Dependency Management", function () {
@@ -77,7 +73,7 @@ describe("01 - WTTP Contract Deployment Tests", function () {
       
       console.log(`Testing on chain ID: ${chainId}`);
       
-      const supportedChains = espDeployments.getSupportedChainIds();
+      const supportedChains = esp.getSupportedChainIds();
       console.log(`ESP supported chains: ${supportedChains.join(", ")}`);
       
       const isSupported = supportedChains.includes(chainId);
@@ -91,7 +87,7 @@ describe("01 - WTTP Contract Deployment Tests", function () {
       const network = await ethers.provider.getNetwork();
       const chainId = Number(network.chainId);
       
-      const supportedChains = espDeployments.getSupportedChainIds();
+      const supportedChains = esp.getSupportedChainIds();
       const hasDeployment = supportedChains.includes(chainId);
       
       if (!hasDeployment) {
@@ -149,10 +145,6 @@ describe("01 - WTTP Contract Deployment Tests", function () {
 
   describe("ESP Contract Deployment", function () {
     it("should deploy DataPointStorage contract", async function () {
-      // Deploy DataPointStorage
-      const DataPointStorageFactory = await ethers.getContractFactory("DataPointStorage");
-      dataPointStorage = await DataPointStorageFactory.deploy();
-      await dataPointStorage.waitForDeployment();
       
       const deployedAddress = await dataPointStorage.getAddress();
       console.log(`DataPointStorage deployed at: ${deployedAddress}`);
@@ -171,15 +163,7 @@ describe("01 - WTTP Contract Deployment Tests", function () {
     });
 
     it("should deploy DataPointRegistry contract", async function () {
-      // Deploy DataPointRegistry with DPS dependency
-      const DataPointRegistryFactory = await ethers.getContractFactory("DataPointRegistry");
-      dataPointRegistry = await DataPointRegistryFactory.deploy(
-        owner.address,
-        await dataPointStorage.getAddress(),
-        royaltyRate
-      );
-      await dataPointRegistry.waitForDeployment();
-      
+
       const deployedAddress = await dataPointRegistry.getAddress();
       console.log(`DataPointRegistry deployed at: ${deployedAddress}`);
       
@@ -388,7 +372,7 @@ describe("01 - WTTP Contract Deployment Tests", function () {
       const getMethod = 0;
       
       const optionsResponse = await testWTTPSite.testOPTIONS(testPath, getMethod);
-      expect(Number(optionsResponse.status)).to.be.a("number"); // Convert BigInt to number
+      expect(Number(optionsResponse.status)).to.equal(500); // Convert BigInt to number
       
       // Test HEAD method
       const headRequest = {
@@ -401,11 +385,11 @@ describe("01 - WTTP Contract Deployment Tests", function () {
       };
       
       const headResponse = await testWTTPSite.testHEAD(headRequest, getMethod);
-      expect(Number(headResponse.status)).to.be.a("number"); // Convert BigInt to number
+      expect(Number(headResponse.status)).to.equal(404); // Convert BigInt to number
       
       // Test LOCATE method
       const locateResponse = await testWTTPSite.testLOCATE(headRequest, getMethod);
-      expect(Number(locateResponse.head.status)).to.be.a("number"); // Convert BigInt to number
+      expect(Number(locateResponse.head.status)).to.equal(404); // Convert BigInt to number
     });
   });
 
@@ -535,7 +519,7 @@ describe("01 - WTTP Contract Deployment Tests", function () {
         },
         cors: {
           methods: 31,
-          origins: [], // Invalid: empty array instead of 9 elements
+          origins: [ethers.ZeroHash], // empty is implicit *, 1-8 entries or > 9 is invalid
           preset: 0,
           custom: ""
         },

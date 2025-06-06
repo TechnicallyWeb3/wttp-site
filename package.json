@@ -27,10 +27,12 @@
   "homepage": "https://github.com/TechnicallyWeb3/wttp-site#readme",
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
-    "@tw3/esp": "^0.4.2",
-    "@wttp/core": "^0.1.0",
     "hardhat": "^2.24.1",
     "hardhat-change-network": "^0.0.7",
     "hardhat-contract-sizer": "^2.10.0"
+  },
+  "peerDependencies": {
+    "@tw3/esp": "^0.5.2",
+    "@wttp/core": "^0.2.2"
   }
 }

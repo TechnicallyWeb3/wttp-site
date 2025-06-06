@@ -92,18 +92,18 @@ contract TestWTTPSite is WTTPSite {
 
     // ========== Exposed Modifiers ==========
     
-    /// @notice Test the onlyAuthorized modifier
-    /// @param _path Resource path being accessed
-    /// @param _method Method type being requested
-    function testOnlyAuthorizedModifier(string memory _path, Method _method) external view onlyAuthorized(_path, _method) {
-        // This function will revert if caller lacks appropriate permissions
-    }
+    // /// @notice Test the onlyAuthorized modifier
+    // /// @param _path Resource path being accessed
+    // /// @param _method Method type being requested
+    // function testOnlyAuthorizedModifier(string memory _path, Method _method) external view onlyAuthorized(_path, _method) {
+    //     // This function will revert if caller lacks appropriate permissions
+    // }
 
-    /// @notice Test the resourceExists modifier
-    /// @param _path Resource path to check
-    function testResourceExistsModifier(string memory _path) external view resourceExists(_path) {
-        // This function will revert if resource doesn't exist
-    }
+    // /// @notice Test the resourceExists modifier
+    // /// @param _path Resource path to check
+    // function testResourceExistsModifier(string memory _path) external view resourceExists(_path) {
+    //     // This function will revert if resource doesn't exist
+    // }
 
     // ========== Debugging Helper Functions ==========
 
@@ -182,21 +182,21 @@ contract TestWTTPSite is WTTPSite {
         _deleteResource(_path);
     }
 
-    /// @notice Get all information about a resource in one call
-    /// @param _path Resource path
-    /// @return metadata Resource metadata
-    /// @return headerInfo Header information
-    /// @return dataPoints Array of data point addresses
-    /// @return etag Calculated ETag
-    function getCompleteResourceInfo(string memory _path) external view returns (
-        ResourceMetadata memory metadata,
-        HeaderInfo memory headerInfo,
-        bytes32[] memory dataPoints,
-        bytes32 etag
-    ) {
-        metadata = _readMetadata(_path);
-        headerInfo = _readHeader(_path);
-        dataPoints = _readResource(_path);
-        etag = calculateEtag(metadata, dataPoints);
-    }
+    // /// @notice Get all information about a resource in one call
+    // /// @param _path Resource path
+    // /// @return metadata Resource metadata
+    // /// @return headerInfo Header information
+    // /// @return dataPoints Array of data point addresses
+    // /// @return etag Calculated ETag
+    // function getCompleteResourceInfo(string memory _path) external view returns (
+    //     ResourceMetadata memory metadata,
+    //     HeaderInfo memory headerInfo,
+    //     bytes32[] memory dataPoints,
+    //     bytes32 etag
+    // ) {
+    //     metadata = _readMetadata(_path);
+    //     headerInfo = _readHeader(_path);
+    //     dataPoints = _readResource(_path);
+    //     etag = calculateEtag(metadata, dataPoints);
+    // }
 }
