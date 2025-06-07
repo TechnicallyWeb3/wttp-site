@@ -34,16 +34,16 @@ export function createUniqueData(baseString: string = "Test Data"): string {
       deleteEspContracts();
     }
 
-    console.log("Copying ESP contracts to contracts/test/esp");
+    // console.log("Copying ESP contracts to contracts/test/esp");
     const sourcePath = path.resolve("node_modules/@tw3/esp/contracts");
     const destPath = path.resolve("contracts/test/esp");
     
     // Create directories if they don't exist
     if (!fs.existsSync(destPath) || force) {
-      console.log(`Creating directory ${destPath}`);
+      // console.log(`Creating directory ${destPath}`);
       fs.mkdirSync(destPath, { recursive: true });
       
-      console.log(`Copying ESP contracts from ${sourcePath} to ${destPath}`);
+      // console.log(`Copying ESP contracts from ${sourcePath} to ${destPath}`);
       fs.cpSync(sourcePath, destPath, { recursive: true });
       
       // Verify the copy was successful
@@ -53,24 +53,24 @@ export function createUniqueData(baseString: string = "Test Data"): string {
         if (!fs.existsSync(filePath)) {
           throw new Error(`Failed to copy required file: ${file}`);
         }
-        console.log(`✓ Verified ${file} exists`);
+        // console.log(`✓ Verified ${file} exists`);
       }
       
-      console.log("✓ ESP contracts copied and verified successfully");
+      // console.log("✓ ESP contracts copied and verified successfully");
       
       // Small delay to ensure filesystem operations are complete
       await new Promise(resolve => setTimeout(resolve, 100));
     } else {
-      console.log("ESP contracts already exist in contracts/test/esp");
-      console.log("ESP contracts path:", fs.realpathSync(destPath));
+      // console.log("ESP contracts already exist in contracts/test/esp");
+      // console.log("ESP contracts path:", fs.realpathSync(destPath));
     }
 
   }
 
   export function deleteEspContracts() {
-    console.log("Deleting ESP contracts from contracts/test/esp");
+    // console.log("Deleting ESP contracts from contracts/test/esp");
     if (fs.existsSync("contracts/test/esp/interfaces")) {
-      console.log("Deleting directory contracts/test/esp/interfaces");
+      // console.log("Deleting directory contracts/test/esp/interfaces");
       fs.rmdirSync("contracts/test/esp/interfaces", { recursive: true });
     }
   }
@@ -82,7 +82,7 @@ export function createUniqueData(baseString: string = "Test Data"): string {
 
   export async function compileEspContracts() {      // compile the contracts
     try {
-      console.log("Starting contract compilation...");
+      // console.log("Starting contract compilation...");
       
       // Verify source files exist before compiling
       const requiredFiles = ["DataPointStorage.sol", "DataPointRegistry.sol"];
@@ -98,9 +98,9 @@ export function createUniqueData(baseString: string = "Test Data"): string {
       // compile the contracts with hardhat compile and wait for completion
       await new Promise<void>((resolve, reject) => {
           exec('npx hardhat compile', { timeout: 60000 }, (error, stdout, stderr) => {
-              console.log(`stdout: ${stdout}`);
+              // console.log(`stdout: ${stdout}`);
               if (stderr) {
-                  console.error(`stderr: ${stderr}`);
+                  // console.error(`stderr: ${stderr}`);
               }
               if (error) {
                   reject(new Error(`Failed to compile dps and dpr contracts: ${error.message}`));
@@ -116,9 +116,9 @@ export function createUniqueData(baseString: string = "Test Data"): string {
         throw new Error("Contract artifacts were not created after compilation");
       }
       
-      console.log("✓ Contracts compiled successfully");
+      // console.log("✓ Contracts compiled successfully");
   } catch (error) {
-      console.error("Error compiling dps and dpr contracts:", error);
+      // console.error("Error compiling dps and dpr contracts:", error);
       throw error;
   }
 }

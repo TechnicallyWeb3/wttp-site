@@ -283,7 +283,7 @@ describe("01 - WTTP Contract Deployment Tests", function () {
       expect(deployedAddress).to.match(/^0x[a-fA-F0-9]{40}$/);
       
       // Test basic functionality
-      const dprAddress = await testWTTPStorage.getDPR_();
+      const dprAddress = await testWTTPStorage.DPR();
       expect(dprAddress).to.equal(await dataPointRegistry.getAddress());
       
       const maxMethods = await testWTTPStorage.getMaxMethods();
@@ -297,17 +297,14 @@ describe("01 - WTTP Contract Deployment Tests", function () {
       const receipt = await headerTx.wait();
       expect(receipt).to.not.be.null; // Test that the transaction was successful
       
-      // Test default header setting
-      await testWTTPStorage.setDefaultHeaderPublic(testHeader);
+      // extract the header address from the receipt from the ""
       
       // Test metadata operations
       const testPath = "/test/resource";
       const metadata = await testWTTPStorage.readMetadata(testPath);
       expect(metadata.size).to.equal(0);  // Check size instead of path for non-existent resource
-      
-      // Test resource existence check
-      const exists = await testWTTPStorage.resourceExists(testPath);
-      expect(exists).to.be.false;
+      expect(metadata.version).to.equal(0); // should not incriment until the resource is created
+      expect(metadata.lastModified).to.equal(0); // should not update until the resource is created
     });
 
     it("should test exposed internal functions", async function () {
@@ -345,7 +342,7 @@ describe("01 - WTTP Contract Deployment Tests", function () {
       expect(deployedAddress).to.match(/^0x[a-fA-F0-9]{40}$/);
       
       // Test inheritance from storage
-      const exists = await testWTTPSite.resourceExistsPublic("/test");
+      const exists = await testWTTPSite.resourceExists("/test");
       expect(exists).to.be.false;
     });
 
@@ -369,10 +366,10 @@ describe("01 - WTTP Contract Deployment Tests", function () {
     it("should test HTTP method operations", async function () {
       // Test OPTIONS method
       const testPath = "/test/options";
-      const getMethod = 0;
+      const optionsMethod = 6; // OPTIONS
       
-      const optionsResponse = await testWTTPSite.testOPTIONS(testPath, getMethod);
-      expect(Number(optionsResponse.status)).to.equal(500); // Convert BigInt to number
+      const optionsResponse = await testWTTPSite.testOPTIONS(testPath, optionsMethod);
+      expect(Number(optionsResponse.status)).to.equal(204); // Convert BigInt to number
       
       // Test HEAD method
       const headRequest = {
@@ -383,14 +380,19 @@ describe("01 - WTTP Contract Deployment Tests", function () {
         ifUnmodifiedSince: 0,
         range: { start: 0, end: 0 }
       };
+      const headMethod = 0; // HEAD
       
       await expect(
-        testWTTPSite.testHEAD(headRequest, getMethod)
+        testWTTPSite.testHEAD(headRequest, headMethod)
       ).to.be.revertedWithCustomError(testWTTPSite, "_404");
       
       // Test LOCATE method
+      const locateRequest = {
+        head: headRequest,
+        rangeChunks: { start: 0, end: 0 }
+      };
       await expect(
-        testWTTPSite.testLOCATE(headRequest, getMethod)
+        testWTTPSite.LOCATE(locateRequest)
       ).to.be.revertedWithCustomError(testWTTPSite, "_404");
     });
   });
@@ -447,7 +449,7 @@ describe("01 - WTTP Contract Deployment Tests", function () {
       expect(storedData).to.equal(ethers.hexlify(testData));
       
       // 3. Test that storage contracts can interact with DPR
-      const dprFromStorage = await testWTTPStorage.getDPR_();
+      const dprFromStorage = await testWTTPStorage.DPR();
       expect(dprFromStorage).to.equal(await dataPointRegistry.getAddress());
       
       // 4. Test site contract authorization

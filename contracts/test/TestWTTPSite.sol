@@ -5,7 +5,7 @@ import "../WTTPSite.sol";
 
 /// @title Test WTTP Site Contract
 /// @notice Concrete implementation of the WTTPSite abstract contract for testing
-/// @dev Provides a deployable implementation of the WTTP site with full debugging access to internal functions
+/// @dev Provides a deployable implementation of the WTTP site with debugging access to internal functions
 contract TestWTTPSite is WTTPSite {
 
     /// @notice Initializes the site contract with necessary dependencies
@@ -19,7 +19,7 @@ contract TestWTTPSite is WTTPSite {
         address _owner
     ) WTTPSite(_dpr, _defaultHeader, _owner) {}
 
-    // ========== Exposed Internal Functions ==========
+    // ========== Exposed Internal Functions (Not Available Publicly) ==========
     
     /// @notice Public wrapper for _getAuthorizedRole
     /// @param _path Resource path to check
@@ -42,19 +42,37 @@ contract TestWTTPSite is WTTPSite {
         return _isAuthorized(_path, _method, _account);
     }
 
-    /// @notice Public wrapper for _resourceGone
-    /// @param _path Resource path to check
-    /// @return bool True if the resource was deleted
-    function resourceGone(string memory _path) external view returns (bool) {
-        return _resourceGone(_path);
-    }
-
     /// @notice Public wrapper for _methodAllowed
     /// @param _path Resource path to check
     /// @param _method Method type being requested
     /// @return bool True if the method is allowed
     function methodAllowed(string memory _path, Method _method) external view returns (bool) {
         return _methodAllowed(_path, _method);
+    }
+
+    /// @notice Public wrapper for _resourceExists
+    /// @param _path Path of the resource to check
+    /// @return bool True if the resource exists
+    function resourceExists(string memory _path) external view returns (bool) {
+        return _resourceExists(_path);
+    }
+
+    /// @notice Public wrapper for _resourceImmutable
+    /// @param _path Path of the resource to check
+    /// @return bool True if the resource is immutable
+    function resourceImmutable(string memory _path) external view returns (bool) {
+        return _resourceImmutable(_path);
+    }
+
+    /// @notice Public wrapper for _resourceRequiredPayment
+    /// @param _dataRegistration Array of data point registrations
+    /// @return uint256 Required payment amount
+    function resourceRequiredPayment(DataRegistration[] memory _dataRegistration) external view returns (uint256) {
+        return _resourceRequiredPayment(_dataRegistration);
+    }
+
+    function normalizeRange(Range memory _range, uint256 _totalLength) external pure returns (Range memory) {
+        return _normalizeRange(_range, _totalLength);
     }
 
     /// @notice Public wrapper for _OPTIONS
@@ -79,124 +97,58 @@ contract TestWTTPSite is WTTPSite {
         return _HEAD(headRequest, _method);
     }
 
-    /// @notice Public wrapper for _LOCATE
-    /// @param locateRequest Request details
-    /// @param _method Method type being requested
-    /// @return locateResponse Response with metadata and data point locations
-    function testLOCATE(
-        HEADRequest memory locateRequest,
-        Method _method
-    ) external view returns (LOCATEResponse memory locateResponse) {
-        return _LOCATE(locateRequest, _method);
-    }
-
-    // ========== Exposed Modifiers ==========
-    
-    // /// @notice Test the onlyAuthorized modifier
-    // /// @param _path Resource path being accessed
-    // /// @param _method Method type being requested
-    // function testOnlyAuthorizedModifier(string memory _path, Method _method) external view onlyAuthorized(_path, _method) {
-    //     // This function will revert if caller lacks appropriate permissions
-    // }
-
-    // /// @notice Test the resourceExists modifier
-    // /// @param _path Resource path to check
-    // function testResourceExistsModifier(string memory _path) external view resourceExists(_path) {
-    //     // This function will revert if resource doesn't exist
-    // }
-
     // ========== Debugging Helper Functions ==========
-
-    /// @notice Test method bits for a given method
-    /// @param _method The method to get the bit for
-    /// @return uint16 The method bit mask
-    function getMethodBit(Method _method) external pure returns (uint16) {
-        return uint16(1 << uint8(_method));
-    }
-
-    /// @notice Check if a specific method bit is set in a methods bitmask
-    /// @param _methods The methods bitmask
-    /// @param _method The method to check
-    /// @return bool True if the method is allowed
-    function isMethodBitSet(uint16 _methods, Method _method) external pure returns (bool) {
-        uint16 methodBit = uint16(1 << uint8(_method));
-        return _methods & methodBit != 0;
-    }
 
     /// @notice Get the ETag for a resource
     /// @param _path Resource path
     /// @return bytes32 The calculated ETag
     function getResourceEtag(string memory _path) external view returns (bytes32) {
         ResourceMetadata memory _metadata = _readMetadata(_path);
-        bytes32[] memory resourceData = _readResource(_path);
+        bytes32[] memory resourceData = _readResource(_path, Range(0, 0));
         return calculateEtag(_metadata, resourceData);
     }
 
-    // ========== Access to Inherited Functions ==========
+    // ========== Essential Storage Access Functions ==========
     
-    /// @notice Public access to inherited _resourceExists from WTTPStorage
-    /// @param _path Path of the resource to check
-    /// @return bool True if the resource exists
-    function resourceExistsPublic(string memory _path) external view returns (bool) {
-        return _resourceExists(_path);
-    }
-
     /// @notice Public access to inherited _readMetadata from WTTPStorage
     /// @param _path Path of the resource
     /// @return ResourceMetadata Metadata information for the resource
-    function readMetadataPublic(string memory _path) external view returns (ResourceMetadata memory) {
+    function readMetadata(string memory _path) external view returns (ResourceMetadata memory) {
         return _readMetadata(_path);
     }
 
     /// @notice Public access to inherited _readHeader from WTTPStorage
     /// @param _path The path of the resource
     /// @return HeaderInfo The header information
-    function readHeaderPublic(string memory _path) external view returns (HeaderInfo memory) {
+    function readHeader(string memory _path) external view returns (HeaderInfo memory) {
         return _readHeader(_path);
     }
 
     /// @notice Public access to inherited _readResource from WTTPStorage
     /// @param _path Path of the resource
+    /// @param _range Range of data to read
     /// @return bytes32[] Array of data point addresses comprising the resource
-    function readResourcePublic(string memory _path) external view returns (bytes32[] memory) {
-        return _readResource(_path);
+    function readResource(string memory _path, Range memory _range) external view returns (bytes32[] memory) {
+        return _readResource(_path, _range);
     }
 
     /// @notice Public access to inherited _createHeader from WTTPStorage
     /// @param _header The header information to store
     /// @return bytes32 The unique identifier for the stored header
-    function createHeaderPublic(HeaderInfo memory _header) external returns (bytes32) {
+    function createHeader(HeaderInfo memory _header) external returns (bytes32) {
         return _createHeader(_header);
     }
 
     /// @notice Public access to inherited _updateMetadata from WTTPStorage
     /// @param _path Path of the resource to update
     /// @param _metadata New metadata to store
-    function updateMetadataPublic(string memory _path, ResourceMetadata memory _metadata) external {
+    function updateMetadata(string memory _path, ResourceMetadata memory _metadata) external {
         _updateMetadata(_path, _metadata);
     }
 
     /// @notice Public access to inherited _deleteResource from WTTPStorage
     /// @param _path Path of the resource to delete
-    function deleteResourcePublic(string memory _path) external {
+    function deleteResource(string memory _path) external {
         _deleteResource(_path);
     }
-
-    // /// @notice Get all information about a resource in one call
-    // /// @param _path Resource path
-    // /// @return metadata Resource metadata
-    // /// @return headerInfo Header information
-    // /// @return dataPoints Array of data point addresses
-    // /// @return etag Calculated ETag
-    // function getCompleteResourceInfo(string memory _path) external view returns (
-    //     ResourceMetadata memory metadata,
-    //     HeaderInfo memory headerInfo,
-    //     bytes32[] memory dataPoints,
-    //     bytes32 etag
-    // ) {
-    //     metadata = _readMetadata(_path);
-    //     headerInfo = _readHeader(_path);
-    //     dataPoints = _readResource(_path);
-    //     etag = calculateEtag(metadata, dataPoints);
-    // }
 }

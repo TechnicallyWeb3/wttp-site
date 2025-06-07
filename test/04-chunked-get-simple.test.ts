@@ -20,18 +20,18 @@ describe("Simple Chunked GET Test", function () {
             expect(getFunction).to.not.be.null;
             
             if (getFunction) {
-            // The function should accept LOCATERequest as parameter
-            // LOCATERequest has: { head: HEADRequest, rangeChunks: Range }
-            expect(getFunction.inputs).to.have.length(1);
-            expect(getFunction.inputs[0].name).to.equal("getRequest");
+                // The function should accept LOCATERequest as parameter
+                // LOCATERequest has: { head: HEADRequest, rangeChunks: Range }
+                expect(getFunction.inputs).to.have.length(1);
+                expect(getFunction.inputs[0].name).to.equal("getRequest");
+                
+                // The function should return LOCATEResponse
+                expect(getFunction.outputs).to.have.length(1);
+                expect(getFunction.outputs[0].name).to.equal("locateResponse");
             
-            // The function should return LOCATEResponse
-            expect(getFunction.outputs).to.have.length(1);
-            expect(getFunction.outputs[0].name).to.equal("locateResponse");
-            
-            console.log("✅ GET function signature verified:");
-            console.log(`  Input: ${getFunction.inputs[0].type} ${getFunction.inputs[0].name}`);
-            console.log(`  Output: ${getFunction.outputs[0].type} ${getFunction.outputs[0].name}`);
+            // console.log("✅ GET function signature verified:");
+            // console.log(`  Input: ${getFunction.inputs[0].type} ${getFunction.inputs[0].name}`);
+            // console.log(`  Output: ${getFunction.outputs[0].type} ${getFunction.outputs[0].name}`);
             }
         });
 
@@ -56,10 +56,10 @@ describe("Simple Chunked GET Test", function () {
             expect(locateRequest.rangeChunks.start).to.equal(0);
             expect(locateRequest.rangeChunks.end).to.equal(0);
             
-            console.log("✅ LOCATERequest structure verified:");
-            console.log("  head.path:", locateRequest.head.path);
-            console.log("  rangeChunks.start:", locateRequest.rangeChunks.start);
-            console.log("  rangeChunks.end:", locateRequest.rangeChunks.end);
+            // console.log("✅ LOCATERequest structure verified:");
+            // console.log("  head.path:", locateRequest.head.path);
+            // console.log("  rangeChunks.start:", locateRequest.rangeChunks.start);
+            // console.log("  rangeChunks.end:", locateRequest.rangeChunks.end);
         });
 
         it("should verify that scripts can use the new structure", async function () {
@@ -102,7 +102,7 @@ describe("Simple Chunked GET Test", function () {
                         console.error("Error copying contracts:", error);
                         throw error;
                     }
-                    console.log("Compiling contracts");
+                    // console.log("Compiling contracts");
                     try {
                         // compile the contracts with hardhat compile and wait for completion
                         await new Promise<void>((resolve, reject) => {
@@ -118,9 +118,9 @@ describe("Simple Chunked GET Test", function () {
                                 resolve();
                             });
                         });
-                        console.log("Contracts compiled successfully");
+                        // console.log("Contracts compiled successfully");
                     } catch (error) {
-                        console.error("Error compiling dps and dpr contracts:", error);
+                        // console.error("Error compiling dps and dpr contracts:", error);
                         throw error;
                     }
                     
@@ -129,7 +129,7 @@ describe("Simple Chunked GET Test", function () {
                         dps = await (await ethers.getContractFactory("DataPointStorage")).deploy() as IDataPointStorage;
                         dpr = await (await ethers.getContractFactory("DataPointRegistry")).deploy(deployer.address, dps.target, 1000) as IDataPointRegistry;
                     } catch (error) {
-                        console.error("Error deploying dps and dpr contracts:", error);
+                        // console.error("Error deploying dps and dpr contracts:", error);
                         throw error;
                     }
                 }
@@ -155,7 +155,7 @@ describe("Simple Chunked GET Test", function () {
                 site = await (await ethers.getContractFactory("TestWTTPSite")).deploy(dpr.target, defaultHeader, deployer.address);
 
             } catch (error) {
-                console.error("Error deploying site contract:", error);
+                // console.error("Error deploying site contract:", error);
                 throw error;
             }
         });
@@ -170,7 +170,7 @@ describe("Simple Chunked GET Test", function () {
             expect(site).to.not.be.undefined;
             expect(dps).to.not.be.undefined;
             
-            console.log("✅ Contracts initialized and fetchResource function available");
+            // console.log("✅ Contracts initialized and fetchResource function available");
         });
     });
 }); 

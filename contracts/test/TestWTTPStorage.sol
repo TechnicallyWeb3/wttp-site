@@ -20,18 +20,12 @@ contract TestWTTPStorage is WTTPStorage {
     ) WTTPStorage(_owner, _dpr, _defaultHeader) {}
 
     // ========== Exposed Internal Variables ==========
-    
-    /// @notice Public getter for the internal DPR_ variable
-    /// @return IDataPointRegistry The internal DPR reference
-    function getDPR_() external view returns (IDataPointRegistry) {
-        return DPR_;
-    }
 
     /// @notice Public setter for DPR_ for testing purposes
     /// @dev Allows direct manipulation of the DPR reference for debugging
     /// @param _dpr New DPR address
-    function setDPR_ForTesting(address _dpr) external {
-        DPR_ = IDataPointRegistry(_dpr);
+    function setDPR(address _dpr) external {
+        _setDPR(_dpr);
     }
 
     // ========== Exposed Header Operations ==========
@@ -56,8 +50,15 @@ contract TestWTTPStorage is WTTPStorage {
 
     /// @notice Public wrapper for _setDefaultHeader
     /// @param _header The header information to use as default
-    function setDefaultHeaderPublic(HeaderInfo memory _header) external {
+    function setDefaultHeader(HeaderInfo memory _header) external {
         _setDefaultHeader(_header);
+    }
+
+    /// @notice Public wrapper for _updateHeader
+    /// @param _headerAddress The address of the header to update
+    /// @param _header The header information to store
+    function updateHeader(bytes32 _headerAddress, HeaderInfo memory _header) external {
+        _updateHeader(_headerAddress, _header);
     }
 
     // ========== Exposed Metadata Operations ==========
@@ -96,15 +97,6 @@ contract TestWTTPStorage is WTTPStorage {
     }
 
     // ========== Exposed Resource Operations ==========
-    
-    /// @notice Public wrapper for _resourceExists for testing
-    /// @param _path Path of the resource to check
-    /// @return bool True if the resource exists
-    function resourceExists(
-        string memory _path
-    ) external view returns (bool) {
-        return _resourceExists(_path);
-    }
 
     /// @notice Public wrapper to create resources for testing
     /// @param _path Path where the resource will be stored
@@ -121,9 +113,10 @@ contract TestWTTPStorage is WTTPStorage {
     /// @param _path Path of the resource
     /// @return Array of data point addresses comprising the resource
     function readResource(
-        string memory _path
+        string memory _path,
+        Range memory _range
     ) external view returns (bytes32[] memory) {
-        return _readResource(_path);
+        return _readResource(_path, _range);
     }
 
     /// @notice Public wrapper to update resources for testing
@@ -158,20 +151,14 @@ contract TestWTTPStorage is WTTPStorage {
     }
 
     // ========== Exposed Modifiers ==========
-    
-    /// @notice Public wrapper to test the notImmutable modifier
-    /// @param _path Path to test the modifier with
-    function testNotImmutableModifier(string memory _path) external view notImmutable(_path) {
-        // This function will revert if the resource is immutable
-    }
 
     /// @notice Test if a resource would trigger the notImmutable modifier
     /// @param _path Path to check
     /// @return bool True if the resource is immutable and exists (using internal functions)
     function isResourceImmutable(string memory _path) external view returns (bool) {
         HeaderInfo memory headerInfo = _readHeader(_path);
-        bytes32[] memory resourceData = _readResource(_path);
-        return headerInfo.cache.immutableFlag && resourceData.length > 0;
+        uint256 resourceLength = _readResource(_path, Range(0, 0)).length;
+        return headerInfo.cache.immutableFlag && resourceLength > 0;
     }
 
     // ========== Exposed Constants and Variables ==========
@@ -217,7 +204,7 @@ contract TestWTTPStorage is WTTPStorage {
     /// @param _path Path of the resource
     /// @return uint256 Number of chunks in the resource
     function getResourceChunkCount(string memory _path) external view returns (uint256) {
-        bytes32[] memory resourceData = _readResource(_path);
+        bytes32[] memory resourceData = _readResource(_path, Range(0, 0));
         return resourceData.length;
     }
 
