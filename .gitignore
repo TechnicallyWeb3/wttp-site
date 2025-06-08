@@ -1,6 +1,9 @@
 node_modules
 .env
 
+/dist
+# */interfaces
+
 # Hardhat files
 /cache
 /artifacts
@@ -15,3 +18,7 @@ node_modules
 
 # Hardhat Ignition default folder for deployments against a local node
 ignition/deployments/chain-31337
+
+/backup
+# some working files we don't need to keep
+/agent-files

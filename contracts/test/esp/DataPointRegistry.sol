@@ -19,10 +19,21 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.20;
 
+/// !interface build ./interfaces/IDataPointRegistry.sol
+
+/// !interface import ../types/ESPTypes.sol
+/// !interface import "./IDataPointStorage.sol";
+/// !interface import "./IOwnable.sol";
+
+/// !interface module "@openzeppelin/contracts/access/Ownable.sol" to "./interfaces/IOwnable.sol --remove Context"
+/// !interface remove ReentrancyGuard
+/// !interface replace Ownable with IOwnable
+/// !interface getter DPS_
+
+import "./types/ESPTypes.sol";
+import "./interfaces/IDataPointStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "./interfaces/ESPTypes.sol";
-import "./interfaces/IDataPointStorage.sol";
 
 /// @title Data Point Registry Contract
 /// @notice Manages data point publishing and royalty payments

@@ -1,72 +1,39 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.20;
 
-import "./WTTPPermissions.sol";
+import "./BaseWTTPPermissions.sol";
 
-/// @title WTTP Storage Contract
+/// @title WTTP Base Storage Contract
 /// @notice Manages web resource storage and access control
 /// @dev Core storage functionality for the WTTP protocol, inheriting permission management
 ///      Resources are stored as chunks of data points with associated metadata and headers
-abstract contract WTTPStorage is WTTPPermissions {
+abstract contract BaseWTTPStorage is BaseWTTPPermissions {
+
+    /// @notice Empty header structure for initialization and reset operations
+    HeaderInfo zeroHeader;
+
+    /// @notice Empty metadata structure for initialization and reset operations
+    ResourceMetadata zeroMetadata;
+    // can't be put into the WTTPTypes since it's not a constant and constants don't support structs
+
 
     /// @notice Initializes the storage contract with core dependencies and defaults
     /// @dev Sets up the data point registry and default header
     /// @param _owner Address that will receive the DEFAULT_ADMIN_ROLE
     /// @param _dpr Address of the Data Point Registry contract
-    /// @param _defaultHeader Default header info to use when none is specified
     constructor(
         address _owner,
-        address _dpr, 
-        HeaderInfo memory _defaultHeader
-    ) WTTPPermissions(_owner) {
+        address _dpr
+    ) BaseWTTPPermissions(_owner) {
         DPR_ = IDataPointRegistry(_dpr);
-        _setDefaultHeader(_defaultHeader);
     }
-
-    /// @notice Maximum number of methods that can be stored in a header
-    /// @dev Used as a bound check for method counts (9 bits max)
-    uint16 constant MAX_METHODS = 511;
-    // should this be put into the WTTPTypes in the @wttp/core package?
-    // Maybe we should calculate this based on the max bitmask of the Method enum?
-    // too hard to remove now, but we should consider it for the next major version
-    
-    /// @notice Empty header structure for initialization and reset operations
-    HeaderInfo zeroHeader;
-    // should this be put into the WTTPTypes in the @wttp/core package?
-    
-    /// @notice Empty metadata structure for initialization and reset operations
-    ResourceMetadata zeroMetadata;
-    // should this be put into the WTTPTypes in the @wttp/core package?
 
     /// @notice Reference to the Data Point Registry contract
     /// @dev Used to register data points and access the Data Point Storage
     IDataPointRegistry private DPR_;
 
-    // should the DPS, DPR and setDPR functions be exposed? Technically, making them state variables
-    // would work, and the developer can call them in their implementation contract. This
-    // would limit the gateway's ability to know which DPR to read. So we should expose the DPR
-    // since the DPS is able to be inferred from the DPR contract any contract can interact with 
-    // either the DPR or DPS as needed. This means we expose the least amount of functions possible
-    // while ensuring any consumer of the abstract contract can extend the public DPS for convenience
-    // and choose to add a setDPR function if they want to change the DPR address. This could break
-    // things in their WTTPStorage and unless the developer ensures all data on the old DPS is accessible
-    // via the new DPR().DPS() function, this could be a problem. S
-    // /// @notice Returns the Data Point Storage contract instance
-    // /// @dev Accesses DPS through the DPR to maintain proper reference hierarchy
-
-    /// @notice Updates the Data Point Registry contract address
-    /// @dev Restricted to admin role for security
-    /// @param _dpr New address for the Data Point Registry contract
-    function _setDPR(address _dpr) internal onlyRole(DEFAULT_ADMIN_ROLE) {
-        DPR_ = IDataPointRegistry(_dpr);
-    }
-
-    // ahhh, actually I see, DPS() is easier than using DPR_.DPS() every time. Since we need
-    // the internal function we decided to expose it as a public view function also. Let's 
-    // restrict this to internal only for now. Doing so should reduce the contract size.
-
     /// @return IDataPointStorage The Data Point Storage contract
-    function DPS() internal view virtual returns (IDataPointStorage) {
+    function DPS() public view virtual returns (IDataPointStorage) {
         return DPR_.DPS_();
     }
 
@@ -135,13 +102,17 @@ abstract contract WTTPStorage is WTTPPermissions {
         // We should include the public role for OPTIONS, HEAD, GET by default but restrict 
         // the POST, PUT, PATCH, DEFINE and DELETE methods to the super admin only.
         // This follows the policy of least privilege as we should.
+
+        // must check redirect code to prevent fake status code injection
         uint16 _redirectCode = _header.redirect.code;
         if (_redirectCode !=0 && (_redirectCode < 300 || _redirectCode > 310)) {
             revert _3xx(_header.redirect);
         }
 
-        uint256 _origins = _header.cors.origins.length;
-        if (_origins != uint8(type(Method).max) + 1) {
+        // removed automated building of empty origins array to cut bulk
+
+        uint8 _origins = uint8(_header.cors.origins.length);
+        if (_origins != maxMethods_()) {
             // needed since origins must exactly match the number of methods,
             // using role bytes32(0) means only admin can access the resource, using role
             // bytes32(max) means the public role can access the resource.
@@ -162,11 +133,13 @@ abstract contract WTTPStorage is WTTPPermissions {
     /// @dev Default header is stored at bytes32(0)
     /// @param _header The header information to use as default
     function _setDefaultHeader(HeaderInfo memory _header) internal virtual {
+        // should we make the function onlyRole(DEFAULT_ADMIN_ROLE)?
+        // this function should be internal only, we don't need to expose it to the public,
+        // but if the developer wants to expose it, they should exercise caution,
+        // site admins can elevate their permissions if they can access this function,
+        // but this needs to be called during at least the constructor of the site contract
         _updateHeader(bytes32(0), _header);
     }
-
-    // let's leave the inernal function since it can be useful, we can remove the external function
-    // and let the developer choose to add a setDefaultHeader function in their implementation contract.
 
     // /// @notice Updates the default header information
     // /// @dev Only site admins can modify the default header

@@ -19,7 +19,10 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.20;
 
-import "./interfaces/ESPTypes.sol";
+/// !interface build ./interfaces/IDataPointStorage.sol
+/// !interface import "../types/ESPTypes.sol";
+
+import "./types/ESPTypes.sol";
 
 /// @title Data Point Storage Contract
 /// @notice Provides core storage functionality for data points

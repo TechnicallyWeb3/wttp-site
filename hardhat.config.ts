@@ -2,11 +2,12 @@ import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "hardhat-change-network";
 import "hardhat-contract-sizer";
+import "hardhat-build";
 
-// // Import task definitions
-// import "./tasks/deploy";
-// import "./tasks/fetch";
-// import "./tasks/upload";
+// Import task definitions
+import "./src/tasks/deploy";
+import "./src/tasks/fetch";
+import "./src/tasks/upload";
 
 const config: HardhatUserConfig = {
   solidity: "0.8.28",
@@ -15,6 +16,11 @@ const config: HardhatUserConfig = {
     disambiguatePaths: false,
     runOnCompile: true,
     strict: true,
+  },
+  networks: {
+    hardhat: {
+      // Default hardhat network configuration
+    }
   }
 };
 

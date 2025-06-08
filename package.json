@@ -1,38 +1,57 @@
 {
-  "name": "wttp-site",
-  "version": "0.0.1",
-  "description": "WTTP Website or \"Web3Site\" contracts to enable HTTP like communication using the blockchain.",
-  "main": "index.js",
+  "name": "hardhat-build-interface",
+  "version": "1.0.0",
+  "description": "Hardhat plugin for autonomous interface generation with directive-based parsing",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "test": "npx hardhat test"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/TechnicallyWeb3/wttp-site.git"
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "test": "mocha test/**/*.test.ts --require ts-node/register",
+    "lint": "eslint src/**/*.ts",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
-    "WTTP",
-    "web3",
-    "website",
-    "contract",
-    "web3",
-    "blockchain",
-    "ethereum"
+    "hardhat",
+    "plugin",
+    "solidity",
+    "interface",
+    "typescript",
+    "smart-contracts",
+    "automation",
+    "code-generation"
   ],
   "author": "TechnicallyWeb3",
-  "license": "AGPL-3.0",
-  "bugs": {
-    "url": "https://github.com/TechnicallyWeb3/wttp-site/issues"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TechnicallyWeb3/hardhat-build-interface.git"
   },
-  "homepage": "https://github.com/TechnicallyWeb3/wttp-site#readme",
+  "homepage": "https://github.com/TechnicallyWeb3/hardhat-build-interface#readme",
+  "bugs": {
+    "url": "https://github.com/TechnicallyWeb3/hardhat-build-interface/issues"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "hardhat": "^2.0.0"
+  },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
-    "hardhat": "^2.24.1",
+    "@types/node": "^18.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@wttp/core": "^0.2.2",
+    "eslint": "^8.0.0",
+    "hardhat": "^2.19.0",
+    "hardhat-build": "^0.1.2",
     "hardhat-change-network": "^0.0.7",
-    "hardhat-contract-sizer": "^2.10.0"
-  },
-  "peerDependencies": {
-    "@tw3/esp": "^0.5.2",
-    "@wttp/core": "^0.2.2"
+    "hardhat-contract-sizer": "^2.10.0",
+    "mocha": "^10.0.0",
+    "ts-node": "^10.0.0",
+    "typescript": "^5.0.0"
   }
 }
