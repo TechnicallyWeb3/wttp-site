@@ -69,7 +69,7 @@ describe("Simple Chunked GET Test", function () {
             // Just verify the function exists and can be imported
             expect(fetchResourceFromSite).to.be.a('function');
             
-            console.log("✅ Scripts updated to use LOCATERequest structure");
+            // console.log("✅ Scripts updated to use LOCATERequest structure");
         });
     });
     let dps: IDataPointStorage;

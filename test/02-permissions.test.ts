@@ -624,7 +624,7 @@ describe("02 - WTTP Permissions Security Audit", function () {
       await testWTTPPermissions.connect(owner).grantRole(childRole, user2.address);
       expect(await testWTTPPermissions.hasRole(childRole, user2.address)).to.be.true;
       
-      console.log("Note: Testing basic role hierarchy functionality");
+      // console.log("Note: Testing basic role hierarchy functionality");
     });
   });
 
@@ -632,8 +632,9 @@ describe("02 - WTTP Permissions Security Audit", function () {
     // Log any critical findings after each test
     const currentSiteAdminRole = await testWTTPPermissions.getSiteAdminRole();
     
-    if (currentSiteAdminRole !== siteAdminRole) {
-      console.log(`⚠️  SITE_ADMIN_ROLE was modified: ${currentSiteAdminRole}`);
-    }
+    // doesn't matter, new site deployed before each test
+    // if (currentSiteAdminRole !== siteAdminRole) {
+    //   // console.log(`⚠️  SITE_ADMIN_ROLE was modified: ${currentSiteAdminRole}`);
+    // }
   });
 });

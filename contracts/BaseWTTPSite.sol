@@ -11,7 +11,7 @@ import "./BaseWTTPStorage.sol";
 /// @title WTTP Base Site Contract
 /// @notice Implements core WTTP protocol methods for HTTP-like operations on blockchain
 /// @dev Extends WTTPBaseStorage to provide web-like interactions with blockchain resources
-abstract contract TestWTTPSite is BaseWTTPStorage {
+abstract contract BaseWTTPSite is BaseWTTPStorage {
 
     constructor(
         address _owner,
@@ -296,6 +296,7 @@ abstract contract TestWTTPSite is BaseWTTPStorage {
         DataRegistration[] memory _data = putRequest.data;
         uint16 _status = 500; // Internal Server Error
         bool resourceExisted = _resourceExists(_path);
+        bytes32 _headerAddress = _readMetadata(_path).header;
         if (resourceExisted) _deleteResource(_path); // delete any existing resource
         if (putRequest.data.length > 0) {
             _uploadResource(_path, _data);
@@ -310,7 +311,7 @@ abstract contract TestWTTPSite is BaseWTTPStorage {
                 size: 0, // calculated during upload
                 version: 0, // calculated during upload
                 lastModified: 0, // calculated during upload
-                header: _readMetadata(_path).header // preserve header
+                header: _headerAddress // preserve header
             })
         );
 

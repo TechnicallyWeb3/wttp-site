@@ -54,4 +54,8 @@ contract TestWTTPSite is BaseWTTPSite {
     function testGetResourceEtag(string memory path) public view returns (bytes32) {
         return _HEAD(HEADRequest({path: path, ifModifiedSince: 0, ifNoneMatch: bytes32(0)}), Method.HEAD).etag;
     }
+
+    function testSiteSetDefaultHeader(HeaderInfo memory _header) public {
+        _setDefaultHeader(_header);
+    }
 }

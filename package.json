@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "watch": "tsc --watch",
-    "test": "mocha test/**/*.test.ts --require ts-node/register",
+    "test": "npx hardhat test",
     "lint": "eslint src/**/*.ts",
     "prepublishOnly": "npm run build"
   },

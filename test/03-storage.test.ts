@@ -161,35 +161,7 @@ describe("03 - WTTP Storage Security Audit", function () {
   });
 
   describe("🚨 DEFAULT_ADMIN_ROLE Storage Security Audit", function () {
-    it.skip("should allow DEFAULT_ADMIN to change DPR", async function () {
-      // Deploy a new DPR for testing
-      const newDataPointRegistry = await (await ethers.getContractFactory("DataPointRegistry")).deploy(
-        owner.address,
-        await dataPointStorage.getAddress(),
-        royaltyRate
-      );
-      await newDataPointRegistry.waitForDeployment();
-
-      // await testWTTPStorage.connect(owner).testSetDPR(await newDataPointRegistry.getAddress());
-      expect(await testWTTPStorage.DPR()).to.equal(await newDataPointRegistry.getAddress());
-    });
-
-    it.skip("should prevent non-DEFAULT_ADMIN from changing DPR", async function () {
-      const newDataPointRegistry = await (await ethers.getContractFactory("DataPointRegistry")).deploy(
-        owner.address,
-        await dataPointStorage.getAddress(),
-        royaltyRate
-      );
-      await newDataPointRegistry.waitForDeployment();
-
-      // await expect(
-      //   testWTTPStorage.connect(siteAdmin).setDPR(await newDataPointRegistry.getAddress())
-      // ).to.be.reverted;
-
-      // await expect(
-      //   testWTTPStorage.connect(attacker).setDPR(await newDataPointRegistry.getAddress())
-      // ).to.be.reverted;
-    });
+    // NOTE: DPR manipulation tests removed - DPR is immutable and set in constructor only
 
     it("should allow DEFAULT_ADMIN to set default header", async function () {
       const newHeader = { ...testHeader };
@@ -217,28 +189,7 @@ describe("03 - WTTP Storage Security Audit", function () {
     //   ).to.be.reverted;
     // });
 
-    it.skip("should prevent direct DPR manipulation through test functions", async function () {
-      const maliciousDPR = await (await ethers.getContractFactory("DataPointRegistry")).deploy(
-        attacker.address,
-        await dataPointStorage.getAddress(),
-        royaltyRate
-      );
-      await maliciousDPR.waitForDeployment();
 
-      // Non-admin should not be able to manipulate DPR reference
-      // await expect(
-      //   testWTTPStorage.connect(attacker).setDPR(await maliciousDPR.getAddress())
-      // ).to.be.revertedWithCustomError(testWTTPStorage, "AccessControlUnauthorizedAccount");
-      
-      // Test function should not allow direct manipulation since internal function is protected
-      expect(await testWTTPStorage.DPR()).to.equal(await dataPointRegistry.getAddress());
-      
-      // Change to malicious DPR using onwer
-      // await (await testWTTPStorage.connect(owner).setDPR(await maliciousDPR.getAddress())).wait();
-
-      // Verify that the DPR has been changed
-      expect(await testWTTPStorage.DPR()).to.equal(await maliciousDPR.getAddress());
-    });
   });
 
   describe("🛡️ Header Security Audit", function () {
@@ -285,11 +236,17 @@ describe("03 - WTTP Storage Security Audit", function () {
       expect(headerAddress1).to.equal(headerAddress2);
     });
 
-    it.skip("should calculate consistent header addresses", async function () {
-      // const headerAddress1 = await testWTTPStorage.calculateHeaderAddress(testHeader);
-      // const headerAddress2 = await testWTTPStorage.calculateHeaderAddress(testHeader);
+    it("should calculate consistent header addresses", async function () {
+      // Test the same header creation twice - should return the same address
+      const headerAddress1 = await testWTTPStorage.testCreateHeader.staticCall(testHeader);
       
-      // expect(headerAddress1).to.equal(headerAddress2);
+      // Create the header once
+      await testWTTPStorage.testCreateHeader(testHeader);
+      
+      // Try to create the same header again - should return the same address
+      const headerAddress2 = await testWTTPStorage.testCreateHeader.staticCall(testHeader);
+      
+      expect(headerAddress1).to.equal(headerAddress2);
     });
 
     it("should validate default header properly", async function () {
