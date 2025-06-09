@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.20;
 
+/// !interface build ./interfaces/IBaseWTTPSite.sol
+
+/// !interface import "./IBaseWTTPStorage.sol";
+/// !interface replace BaseWTTPStorage with IBaseWTTPStorage
+
 import "./BaseWTTPStorage.sol";
 
 /// @title WTTP Base Site Contract
@@ -84,7 +89,7 @@ abstract contract BaseWTTPSite is BaseWTTPStorage {
     /// @param _path Resource path being accessed
     modifier onlyAuthorized(string memory _path, Method _method) {
         if (!_methodAllowed(_path, _method)) {
-            revert _405("Method Not Allowed", _readHeader(_path).cors.methods);
+            revert _405("Method Not Allowed", _readHeader(_path).cors.methods, _readHeader(_path).cache.immutableFlag);
         }
         if (!(
             _method == Method.PUT || 

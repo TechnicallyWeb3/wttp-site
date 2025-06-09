@@ -126,7 +126,7 @@ export function createUniqueData(baseString: string = "Test Data"): string {
   export async function loadEspContracts(chainId: number | null = null, royaltyRate: bigint = ethers.parseUnits("0.001", "gwei"), owner: string | null = null, force: boolean = false) : Promise<ESPContracts> {
     let currentChainId = chainId ?? Number((await ethers.provider.getNetwork()).chainId);
     if (hre.network.name === "localhost") {
-      currentChainId = 1337; // overrides so hardhat instances don't get stored
+      currentChainId = 1337; // overrides so localhost instances can be stored
     }
 
     let dps: IDataPointStorage | undefined;
@@ -144,12 +144,12 @@ export function createUniqueData(baseString: string = "Test Data"): string {
       
       // deploy the contracts using the hardhat ethers contract factory
       const dpsFactory = await ethers.getContractFactory("contracts/test/esp/DataPointStorage.sol:DataPointStorage");
-      dps = await dpsFactory.deploy() as IDataPointStorage;
+      dps = await dpsFactory.deploy() as unknown as IDataPointStorage;
       await dps.waitForDeployment();
 
       const dprFactory = await ethers.getContractFactory("contracts/test/esp/DataPointRegistry.sol:DataPointRegistry");
       owner = owner ?? (await ethers.getSigners())[0].address;
-      dpr = await dprFactory.deploy(owner, await dps.getAddress(), royaltyRate) as IDataPointRegistry;
+      dpr = await dprFactory.deploy(owner, await dps.getAddress(), royaltyRate) as unknown as IDataPointRegistry;
       await dpr.waitForDeployment();
 
       if (hre.network.name !== "hardhat") {

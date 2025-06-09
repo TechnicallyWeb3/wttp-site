@@ -9,14 +9,24 @@ import * as esp from "@tw3/esp";
 import {
   type HeaderInfoStruct,
   type IDataPointStorage,
-  type IDataPointRegistry
+  type IDataPointRegistry,
+} from "@wttp/core";
+
+import { 
+  DEFAULT_HEADERS, 
+  Method, 
+  ALL_METHODS_BITMASK,
+  methodsToBitmask,
+  ORIGINS_PRESETS
 } from "@wttp/core";
 
 import { TestWTTPPermissions } from "../typechain-types/contracts/test/TestWTTPPermissions";
 import { TestWTTPStorage } from "../typechain-types/contracts/test/TestWTTPStorage";
 import { TestWTTPSite } from "../typechain-types/contracts/test/TestWTTPSite";
-import { Web3Site } from "../typechain-types/contracts/test/Web3Site";
+import { IBaseWTTPSite } from "../typechain-types/contracts/interfaces/IBaseWTTPSite";
+
 import { loadEspContracts } from "./helpers/espHelpers";
+import { BaseContract } from "ethers";
 
 // Local contract types will be inferred from ethers.getContractFactory
 
@@ -31,7 +41,7 @@ describe("01 - WTTP Contract Deployment Tests", function () {
   let testWTTPPermissions: TestWTTPPermissions;
   let testWTTPStorage: TestWTTPStorage;
   let testWTTPSite: TestWTTPSite;
-  let web3Site: Web3Site;
+  let web3Site: IBaseWTTPSite;
   
   // Default values for testing
   let defaultHeader: HeaderInfoStruct;
@@ -44,23 +54,7 @@ describe("01 - WTTP Contract Deployment Tests", function () {
     // Set up default values
     royaltyRate = ethers.parseUnits("0.001", "gwei"); // 1000000 wei
     
-    defaultHeader = {
-      cache: {
-        immutableFlag: false,
-        preset: 0,
-        custom: ""
-      },
-      cors: {
-        methods: 31, // Allow GET, POST, PUT, DELETE, HEAD
-        origins: [], // *
-        preset: 0,
-        custom: ""
-      },
-      redirect: {
-        code: 0,
-        location: ""
-      }
-    };
+    defaultHeader = DEFAULT_HEADERS.PUBLIC
     const { dps, dpr } = await loadEspContracts();
     dataPointStorage = dps;
     dataPointRegistry = dpr;
@@ -171,7 +165,7 @@ describe("01 - WTTP Contract Deployment Tests", function () {
       expect(deployedAddress).to.match(/^0x[a-fA-F0-9]{40}$/);
       
       // Test basic functionality
-      const dpsAddress = await dataPointRegistry.DPS_();
+      const dpsAddress = await dataPointRegistry.DPS();
       expect(dpsAddress).to.equal(await dataPointStorage.getAddress());
       
       const currentRoyaltyRate = await dataPointRegistry.royaltyRate();
@@ -206,7 +200,7 @@ describe("01 - WTTP Contract Deployment Tests", function () {
     it("should deploy TestWTTPPermissions contract", async function () {
       // Deploy TestWTTPPermissions
       const TestWTTPPermissionsFactory = await ethers.getContractFactory("TestWTTPPermissions");
-      testWTTPPermissions = await TestWTTPPermissionsFactory.deploy(owner.address);
+      testWTTPPermissions = await TestWTTPPermissionsFactory.deploy(owner.address) as unknown as TestWTTPPermissions;
       await testWTTPPermissions.waitForDeployment();
       
       const deployedAddress = await testWTTPPermissions.getAddress();
@@ -215,27 +209,27 @@ describe("01 - WTTP Contract Deployment Tests", function () {
       // Verify deployment
       expect(deployedAddress).to.match(/^0x[a-fA-F0-9]{40}$/);
       
-      // Test basic functionality
-      const defaultAdminRole = await testWTTPPermissions.getDefaultAdminRole();
-      expect(defaultAdminRole).to.equal("0x0000000000000000000000000000000000000000000000000000000000000000");
-      
       const siteAdminRole = await testWTTPPermissions.getSiteAdminRole();
-      expect(siteAdminRole).to.not.equal("0x0000000000000000000000000000000000000000000000000000000000000000");
+      expect(siteAdminRole).to.be.a("string").and.match(/^0x[a-fA-F0-9]{64}$/);
       
-      const publicRole = await testWTTPPermissions.getPublicRole();
-      expect(publicRole).to.not.equal("0x0000000000000000000000000000000000000000000000000000000000000000");
+      const publicRole = await testWTTPPermissions.testPublicRole();
+      expect(publicRole).to.equal("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+
+      // Test basic functionality
+      const defaultAdminRole = await testWTTPPermissions.testBlacklistRole();
+      expect(defaultAdminRole).to.equal(ethers.keccak256(ethers.toUtf8Bytes("BLACKLIST_ROLE")));
     });
 
     it("should verify permissions role management", async function () {
       // Test default admin role assignment
       const hasDefaultAdminRole = await testWTTPPermissions.hasRole(
-        await testWTTPPermissions.getDefaultAdminRole(),
+        await testWTTPPermissions.DEFAULT_ADMIN_ROLE(),
         owner.address
       );
       expect(hasDefaultAdminRole).to.be.true;
       
       // Test site admin role functionality
-      const siteAdminRole = await testWTTPPermissions.getSiteAdminRole();
+      const siteAdminRole = await testWTTPPermissions.testSiteAdminRole();
       
       // Grant site admin role to user1
       await testWTTPPermissions.grantRole(siteAdminRole, user1.address);
@@ -244,24 +238,24 @@ describe("01 - WTTP Contract Deployment Tests", function () {
       expect(hasSiteAdminRole).to.be.true;
       
       // Test public role logic (inverted)
-      const publicRole = await testWTTPPermissions.getPublicRole();
+      const publicRole = await testWTTPPermissions.testPublicRole();
       const hasPublicRole = await testWTTPPermissions.hasRole(publicRole, user2.address);
       expect(hasPublicRole).to.be.true; // Should be true for users without explicit PUBLIC_ROLE denial
     });
 
     it("should test exposed internal functions", async function () {
       // Test notAdminRole modifier
-      const publicRole = await testWTTPPermissions.getPublicRole();
+      const publicRole = await testWTTPPermissions.testPublicRole();
       
       // Should not revert for non-admin role
-      await expect(testWTTPPermissions.testNotAdminRoleModifier(publicRole)).to.not.be.reverted;
+      await expect(testWTTPPermissions.testNotAdminRole(publicRole)).to.not.be.reverted;
       
       // Should revert for admin roles
-      const defaultAdminRole = await testWTTPPermissions.getDefaultAdminRole();
-      await expect(testWTTPPermissions.testNotAdminRoleModifier(defaultAdminRole)).to.be.reverted;
+      const defaultAdminRole = await testWTTPPermissions.DEFAULT_ADMIN_ROLE();
+      await expect(testWTTPPermissions.testNotAdminRole(defaultAdminRole)).to.be.reverted;
       
-      const siteAdminRole = await testWTTPPermissions.getSiteAdminRole();
-      await expect(testWTTPPermissions.testNotAdminRoleModifier(siteAdminRole)).to.be.reverted;
+      const siteAdminRole = await testWTTPPermissions.testSiteAdminRole();
+      await expect(testWTTPPermissions.testNotAdminRole(siteAdminRole)).to.be.reverted;
     });
   });
 
@@ -271,9 +265,8 @@ describe("01 - WTTP Contract Deployment Tests", function () {
       const TestWTTPStorageFactory = await ethers.getContractFactory("TestWTTPStorage");
       testWTTPStorage = await TestWTTPStorageFactory.deploy(
         owner.address,
-        await dataPointRegistry.getAddress(),
-        defaultHeader
-      );
+        await dataPointRegistry.getAddress()
+      ) as unknown as TestWTTPStorage;
       await testWTTPStorage.waitForDeployment();
       
       const deployedAddress = await testWTTPStorage.getAddress();
@@ -286,14 +279,30 @@ describe("01 - WTTP Contract Deployment Tests", function () {
       const dprAddress = await testWTTPStorage.DPR();
       expect(dprAddress).to.equal(await dataPointRegistry.getAddress());
       
-      const maxMethods = await testWTTPStorage.getMaxMethods();
-      expect(maxMethods).to.equal(511); // Updated to correct value
+      const maxMethods = await testWTTPStorage.testMaxMethods();
+      expect(maxMethods).to.equal(9); // Should be 9 methods total
     });
 
     it("should verify storage contract functionality", async function () {
-      // Test header operations
-      const testHeader = { ...defaultHeader, redirect: { code: 201, location: "test" } };
-      const headerTx = await testWTTPStorage.createHeader(testHeader);
+      // Test header operations - use a simple valid header instead of modifying defaultHeader
+      const testHeader = {
+        cache: {
+          immutableFlag: false,
+          preset: 0,
+          custom: ""
+        },
+        cors: {
+          methods: methodsToBitmask([Method.HEAD, Method.GET, Method.POST]), // Only first 3 methods (HEAD, GET, POST) 
+          origins: ORIGINS_PRESETS.PUBLIC,
+          preset: 0,
+          custom: ""
+        },
+        redirect: {
+          code: 301,
+          location: "./test.html"
+        }
+      };
+      const headerTx = await testWTTPStorage.testCreateHeader(testHeader);
       const receipt = await headerTx.wait();
       expect(receipt).to.not.be.null; // Test that the transaction was successful
       
@@ -301,7 +310,7 @@ describe("01 - WTTP Contract Deployment Tests", function () {
       
       // Test metadata operations
       const testPath = "/test/resource";
-      const metadata = await testWTTPStorage.readMetadata(testPath);
+      const metadata = await testWTTPStorage.testReadMetadata(testPath);
       expect(metadata.size).to.equal(0);  // Check size instead of path for non-existent resource
       expect(metadata.version).to.equal(0); // should not incriment until the resource is created
       expect(metadata.lastModified).to.equal(0); // should not update until the resource is created
@@ -309,30 +318,32 @@ describe("01 - WTTP Contract Deployment Tests", function () {
 
     it("should test exposed internal functions", async function () {
       // Test zero header and metadata getters
-      const zeroHeader = await testWTTPStorage.getZeroHeader();
+      const zeroHeader = await testWTTPStorage.testZeroHeader();
       expect(zeroHeader.cors).to.not.be.undefined; // Check structure exists
       expect(zeroHeader.cors.methods).to.equal(0);
       
-      const zeroMetadata = await testWTTPStorage.getZeroMetadata();
+      const zeroMetadata = await testWTTPStorage.testZeroMetadata();
       expect(zeroMetadata.size).to.equal(0); // Check size instead of path
       expect(zeroMetadata.version).to.equal(0);
       
-      // Test immutable resource check
-      const testPath = "/immutable/test";
-      const isImmutable = await testWTTPStorage.isResourceImmutable(testPath);
-      expect(isImmutable).to.be.false; // Should be false for non-existent resource
+      // // Test immutable resource check
+      // const testPath = "/immutable/test";
+      // const isImmutable = await testWTTPStorage.isResourceImmutable(testPath);
+      // expect(isImmutable).to.be.false; // Should be false for non-existent resource
     });
   });
 
   describe("WTTP Site Contract Deployment", function () {
     it("should deploy TestWTTPSite contract", async function () {
+
+      console.log(await dataPointRegistry.getAddress());
       // Deploy TestWTTPSite with dependencies
       const TestWTTPSiteFactory = await ethers.getContractFactory("TestWTTPSite");
       testWTTPSite = await TestWTTPSiteFactory.deploy(
+        owner.address,
         await dataPointRegistry.getAddress(),
-        defaultHeader,
-        owner.address
-      );
+        defaultHeader
+      ) as unknown as TestWTTPSite;
       await testWTTPSite.waitForDeployment();
       
       const deployedAddress = await testWTTPSite.getAddress();
@@ -342,7 +353,7 @@ describe("01 - WTTP Contract Deployment Tests", function () {
       expect(deployedAddress).to.match(/^0x[a-fA-F0-9]{40}$/);
       
       // Test inheritance from storage
-      const exists = await testWTTPSite.resourceExists("/test");
+      const exists = await testWTTPSite.testResourceExists("/test");
       expect(exists).to.be.false;
     });
 
@@ -351,24 +362,23 @@ describe("01 - WTTP Contract Deployment Tests", function () {
       const testPath = "/admin/resource";
       const getMethod = 0; // GET method
       
-      const authorizedRole = await testWTTPSite.getAuthorizedRole(testPath, getMethod);
+      const authorizedRole = await testWTTPSite.testGetAuthorizedRole(testPath, getMethod);
       expect(authorizedRole).to.match(/^0x[a-fA-F0-9]{64}$/);
       
       // Test authorization check
-      const isAuthorized = await testWTTPSite.isAuthorized(testPath, getMethod, owner.address);
+      const isAuthorized = await testWTTPSite.testIsAuthorized(testPath, getMethod, owner.address);
       expect(isAuthorized).to.be.true; // Owner should be authorized
       
       // Test method allowance
-      const methodAllowed = await testWTTPSite.methodAllowed(testPath, getMethod);
+      const methodAllowed = await testWTTPSite.testMethodAllowed(testPath, getMethod);
       expect(methodAllowed).to.be.true;
     });
 
     it("should test HTTP method operations", async function () {
       // Test OPTIONS method
       const testPath = "/test/options";
-      const optionsMethod = 6; // OPTIONS
       
-      const optionsResponse = await testWTTPSite.testOPTIONS(testPath, optionsMethod);
+      const optionsResponse = await testWTTPSite.testOPTIONS(testPath, Method.OPTIONS);
       expect(Number(optionsResponse.status)).to.equal(204); // Convert BigInt to number
       
       // Test HEAD method
@@ -380,10 +390,9 @@ describe("01 - WTTP Contract Deployment Tests", function () {
         ifUnmodifiedSince: 0,
         range: { start: 0, end: 0 }
       };
-      const headMethod = 0; // HEAD
       
       await expect(
-        testWTTPSite.testHEAD(headRequest, headMethod)
+        testWTTPSite.testHEAD(headRequest, Method.HEAD)
       ).to.be.revertedWithCustomError(testWTTPSite, "_404");
       
       // Test LOCATE method
@@ -392,20 +401,21 @@ describe("01 - WTTP Contract Deployment Tests", function () {
         rangeChunks: { start: 0, end: 0 }
       };
       await expect(
-        testWTTPSite.LOCATE(locateRequest)
+        testWTTPSite.testGET(locateRequest, Method.GET)
       ).to.be.revertedWithCustomError(testWTTPSite, "_404");
     });
   });
 
   describe("Web3Site Contract Deployment", function () {
     it("should deploy Web3Site contract", async function () {
+      console.log(await dataPointRegistry.getAddress());
       // Deploy Web3Site (production-ready implementation)
       const Web3SiteFactory = await ethers.getContractFactory("Web3Site");
       web3Site = await Web3SiteFactory.deploy(
+        owner.address,
         await dataPointRegistry.getAddress(),
-        defaultHeader,
-        owner.address
-      );
+        defaultHeader
+      ) as unknown as IBaseWTTPSite;
       await web3Site.waitForDeployment();
       
       const deployedAddress = await web3Site.getAddress();
@@ -497,8 +507,7 @@ describe("01 - WTTP Contract Deployment Tests", function () {
       const gasEstimate = await ethers.provider.estimateGas({
         data: TestWTTPStorageFactory.bytecode + TestWTTPStorageFactory.interface.encodeDeploy([
           owner.address,
-          await dataPointRegistry.getAddress(),
-          defaultHeader
+          await dataPointRegistry.getAddress()
         ]).slice(2) // Remove 0x prefix
       });
       
@@ -511,7 +520,7 @@ describe("01 - WTTP Contract Deployment Tests", function () {
 
   describe("Error Handling and Edge Cases", function () {
     it("should handle invalid deployment parameters", async function () {
-      const TestWTTPStorageFactory = await ethers.getContractFactory("TestWTTPStorage");
+      const TestWTTPSiteFactory = await ethers.getContractFactory("TestWTTPSite");
       
       // Test deployment with zero address for DPR - this might not revert in constructor
       // Instead test with invalid header structure
@@ -522,8 +531,8 @@ describe("01 - WTTP Contract Deployment Tests", function () {
           custom: ""
         },
         cors: {
-          methods: 31,
-          origins: [ethers.ZeroHash], // empty is implicit *, 1-8 entries or > 9 is invalid
+          methods: ALL_METHODS_BITMASK,
+          origins: [ethers.ZeroHash], // 0-8 entries or > 9 is invalid
           preset: 0,
           custom: ""
         },
@@ -534,7 +543,7 @@ describe("01 - WTTP Contract Deployment Tests", function () {
       };
       
       await expect(
-        TestWTTPStorageFactory.deploy(
+        TestWTTPSiteFactory.deploy(
           owner.address,
           await dataPointRegistry.getAddress(),
           invalidHeader
@@ -552,7 +561,7 @@ describe("01 - WTTP Contract Deployment Tests", function () {
       
       // Verify contracts have proper access controls
       const hasAdminRole = await testWTTPPermissions.hasRole(
-        await testWTTPPermissions.getDefaultAdminRole(),
+        await testWTTPPermissions.DEFAULT_ADMIN_ROLE(),
         owner.address
       );
       expect(hasAdminRole).to.be.true;

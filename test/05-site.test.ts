@@ -3,7 +3,7 @@ import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { loadEspContracts, createUniqueData } from "./helpers/espHelpers";
 import { TestWTTPSite } from "../typechain-types/contracts/test/TestWTTPSite";
-import { IDataPointRegistry, IDataPointStorage } from "@wttp/core";
+import { ALL_METHODS_BITMASK, IDataPointRegistry, IDataPointStorage, methodsToBitmask } from "@wttp/core";
 
 describe("05 - WTTP Site Security Audit & Comprehensive Testing", function () {
   let testWTTPSite: TestWTTPSite;
@@ -81,7 +81,7 @@ describe("05 - WTTP Site Security Audit & Comprehensive Testing", function () {
         custom: ""
       },
       cors: {
-        methods: 511, // All methods allowed (2^9 - 1)
+        methods: ALL_METHODS_BITMASK, // All methods allowed (2^9 - 1)
         origins: typicalOrigins,
         preset: 1, // PUBLIC
         custom: ""
@@ -114,7 +114,7 @@ describe("05 - WTTP Site Security Audit & Comprehensive Testing", function () {
     immutableHeader = {
       cors: {
         origins: restrictedOrigins,
-        methods: 68, // HEAD, GET, OPTIONS
+        methods: methodsToBitmask([Method.HEAD, Method.GET, Method.OPTIONS]), // HEAD, GET, OPTIONS
         preset: 5, // PRIVATE
         custom: ""
       },
@@ -133,7 +133,7 @@ describe("05 - WTTP Site Security Audit & Comprehensive Testing", function () {
     redirectHeader = {
       cors: {
         origins: restrictedOrigins,
-        methods: 3, // HEAD, GET
+        methods: methodsToBitmask([Method.HEAD, Method.GET]), // HEAD, GET
         preset: 5, // PRIVATE
         custom: ""
       },
@@ -152,7 +152,7 @@ describe("05 - WTTP Site Security Audit & Comprehensive Testing", function () {
     publicHeader = {
       cors: {
         origins: publicOrigins,
-        methods: 511, // All methods allowed (2^9 - 1)
+        methods: ALL_METHODS_BITMASK, // All methods allowed (2^9 - 1)
         preset: 1, // PUBLIC
         custom: ""
       },
@@ -173,7 +173,7 @@ describe("05 - WTTP Site Security Audit & Comprehensive Testing", function () {
       await dataPointRegistry.getAddress(),
       testHeader,
       owner.address
-    );
+    ) as unknown as TestWTTPSite;
     await testWTTPSite.waitForDeployment();
 
     // Grant roles for testing
@@ -266,7 +266,7 @@ describe("05 - WTTP Site Security Audit & Comprehensive Testing", function () {
 
         it("should normalize range", async function () {
             const range = { start: 0, end: 0 };
-            const normalizedRange = await testWTTPSite.normalizeRange(range, 10);
+            const normalizedRange = await testWTTPSite.testNormalizeRange(range, 10);
             expect(normalizedRange).to.deep.equal([0, 9]);
 
             const range2 = { start: -1, end: 9 };

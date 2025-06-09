@@ -1,4 +1,4 @@
-import { HeaderInfoStruct, IDataPointStorage, IWTTPSite } from "@wttp/core";
+import { HeaderInfoStruct, IDataPointStorage, IWTTPSite, PUBLIC_HEADER } from "@wttp/core";
 import { getSupportedChainIds, IDataPointRegistry, loadContract } from "@tw3/esp";
 import { expect } from "chai";
 import { ethers } from "hardhat";
@@ -25,9 +25,9 @@ describe("Simple Chunked GET Test", function () {
                 expect(getFunction.inputs).to.have.length(1);
                 expect(getFunction.inputs[0].name).to.equal("getRequest");
                 
-                // The function should return LOCATEResponse
+                // The function should return GETResponse
                 expect(getFunction.outputs).to.have.length(1);
-                expect(getFunction.outputs[0].name).to.equal("locateResponse");
+                expect(getFunction.outputs[0].name).to.equal("getResponse");
             
             // console.log("✅ GET function signature verified:");
             // console.log(`  Input: ${getFunction.inputs[0].type} ${getFunction.inputs[0].name}`);
@@ -64,7 +64,7 @@ describe("Simple Chunked GET Test", function () {
 
         it("should verify that scripts can use the new structure", async function () {
             // Import the fetchResource function to verify it compiles
-            const { fetchResourceFromSite } = await import("../scripts/fetchResource");
+            const { fetchResourceFromSite } = await import("../src/scripts/fetchResource");
             
             // Just verify the function exists and can be imported
             expect(fetchResourceFromSite).to.be.a('function');
@@ -89,8 +89,8 @@ describe("Simple Chunked GET Test", function () {
                 // deploy the contracts to the unsupported chain
                 try {
                     // attempt localhost/hardhat deployment
-                    dps = await (await ethers.getContractFactory("DataPointStorage")).deploy() as IDataPointStorage;
-                    dpr = await (await ethers.getContractFactory("DataPointRegistry")).deploy(deployer.address, dps.target, 1000) as IDataPointRegistry;
+                    dps = await (await ethers.getContractFactory("DataPointStorage")).deploy() as unknown as IDataPointStorage;
+                    dpr = await (await ethers.getContractFactory("DataPointRegistry")).deploy(deployer.address, dps.target, 1000) as unknown as IDataPointRegistry;
                 } catch (error) {
                     console.error("Error deploying contracts:", error);
                     console.log("Copying contracts to local storage");
@@ -126,8 +126,8 @@ describe("Simple Chunked GET Test", function () {
                     
                     // attempt to deploy the contracts again
                     try {
-                        dps = await (await ethers.getContractFactory("DataPointStorage")).deploy() as IDataPointStorage;
-                        dpr = await (await ethers.getContractFactory("DataPointRegistry")).deploy(deployer.address, dps.target, 1000) as IDataPointRegistry;
+                        dps = await (await ethers.getContractFactory("DataPointStorage")).deploy() as unknown as IDataPointStorage;
+                        dpr = await (await ethers.getContractFactory("DataPointRegistry")).deploy(deployer.address, dps.target, 1000) as unknown as IDataPointRegistry;
                     } catch (error) {
                         // console.error("Error deploying dps and dpr contracts:", error);
                         throw error;
@@ -135,24 +135,8 @@ describe("Simple Chunked GET Test", function () {
                 }
             }
             try {                   
-                const defaultHeader: HeaderInfoStruct = {
-                    cache: {
-                        immutableFlag: false,
-                        preset: 2, // CachePreset.DEFAULT 
-                        custom: ""
-                    },
-                    cors: {
-                        methods: 0, // 0 defaults to all Bitwise Methods.(GET&POST&PUT&DELETE&PATCH&OPTIONS&HEAD&LOCATE&DEFINE)
-                        origins: [], // should contain exactly 9 if empty * is implicit or [PUBLIC_ROLE, PUBLIC_ROLE, ... ]
-                        preset: 1, // CORSPreset.PUBLIC
-                        custom: ""
-                    },
-                    redirect: {
-                        code: 0,
-                        location: ""
-                    }
-                };
-                site = await (await ethers.getContractFactory("TestWTTPSite")).deploy(dpr.target, defaultHeader, deployer.address);
+                const defaultHeader: HeaderInfoStruct = PUBLIC_HEADER;
+                site = await (await ethers.getContractFactory("TestWTTPSite")).deploy(deployer.address, dpr.target, defaultHeader) as unknown as TestWTTPSite;
 
             } catch (error) {
                 // console.error("Error deploying site contract:", error);
@@ -162,7 +146,7 @@ describe("Simple Chunked GET Test", function () {
 
         it("should verify that the contract can be used to fetch a resource", async function () {
             // Import the fetchResource function to verify it works with deployed contracts
-            const { fetchResourceFromSite } = await import("../scripts/fetchResource");
+            const { fetchResourceFromSite } = await import("../src/scripts/fetchResource");
             
             // This test would require proper contract deployment and setup
             // For now, just verify the function exists and contracts are initialized

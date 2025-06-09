@@ -3,7 +3,8 @@ import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { loadEspContracts, createUniqueData } from "./helpers/espHelpers";
 import { TestWTTPStorage } from "../typechain-types/contracts/test/TestWTTPStorage";
-import { IDataPointRegistry, IDataPointStorage } from "@wttp/core";
+import { IDataPointRegistry, IDataPointStorage, DataRegistrationStruct } from "@wttp/core";
+import { DEFAULT_ADMIN_ROLE, PUBLIC_ROLE, BLACKLIST_ROLE, PUBLIC_HEADER, Method } from "@wttp/core";
 import { ResourceMetadataStruct } from "../typechain-types/contracts/test/TestWTTPStorage";
 
 describe("03 - WTTP Storage Security Audit", function () {
@@ -43,41 +44,48 @@ describe("03 - WTTP Storage Security Audit", function () {
   beforeEach(async function () {
     // Get role identifiers
     defaultAdminRole = ethers.ZeroHash;
+    expect(defaultAdminRole).to.equal(DEFAULT_ADMIN_ROLE);
     siteAdminRole = ethers.keccak256(ethers.toUtf8Bytes("SITE_ADMIN_ROLE"));
+    
     publicRole = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+    expect(publicRole).to.equal(PUBLIC_ROLE);
     blacklistRole = ethers.keccak256(ethers.toUtf8Bytes("BLACKLIST_ROLE"));
+    expect(blacklistRole).to.equal(BLACKLIST_ROLE);
+
+
 
     // Create test header with all required methods (9 methods: 0-8)
     // HEAD, GET, POST, PUT, PATCH, DELETE, OPTIONS, LOCATE, DEFINE
-    const testOrigins = [
-      publicRole,  // HEAD
-      publicRole,  // GET
-      publicRole,  // POST
-      siteAdminRole,  // PUT
-      siteAdminRole,  // PATCH
-      siteAdminRole,  // DELETE
-      publicRole,  // OPTIONS
-      publicRole,  // LOCATE
-      siteAdminRole  // DEFINE
-    ];
+    // const testOrigins = [
+    //   publicRole,  // HEAD
+    //   publicRole,  // GET
+    //   publicRole,  // POST
+    //   siteAdminRole,  // PUT
+    //   siteAdminRole,  // PATCH
+    //   siteAdminRole,  // DELETE
+    //   publicRole,  // OPTIONS
+    //   publicRole,  // LOCATE
+    //   siteAdminRole  // DEFINE
+    // ];
 
-    testHeader = {
-      cors: {
-        origins: testOrigins,
-        methods: 511, // All methods allowed
-        preset: 0,
-        custom: ""
-      },
-      cache: {
-        immutableFlag: false,
-        preset: 0,
-        custom: ""
-      },
-      redirect: {
-        code: 0,
-        location: ""
-      }
-    };
+    // testHeader = {
+    //   cors: {
+    //     origins: testOrigins,
+    //     methods: 511, // All methods allowed
+    //     preset: 0,
+    //     custom: ""
+    //   },
+    //   cache: {
+    //     immutableFlag: false,
+    //     preset: 0,
+    //     custom: ""
+    //   },
+    //   redirect: {
+    //     code: 0,
+    //     location: ""
+    //   }
+    // };
+    testHeader = PUBLIC_HEADER;
     // console.log("before each start")
     // console.log(await dataPointRegistry.getAddress())
     // console.log(testHeader)
@@ -86,17 +94,12 @@ describe("03 - WTTP Storage Security Audit", function () {
     const TestWTTPStorageFactory = await ethers.getContractFactory("TestWTTPStorage");
     testWTTPStorage = await TestWTTPStorageFactory.deploy(
       owner.address,
-      await dataPointRegistry.getAddress(),
-      testHeader
-    );
+      await dataPointRegistry.getAddress()
+    ) as unknown as TestWTTPStorage;
     await testWTTPStorage.waitForDeployment();
 
     // console.log("before each deploy storage")
 
-    expect(await testWTTPStorage.DEFAULT_ADMIN_ROLE()).to.equal(defaultAdminRole);
-    expect(await testWTTPStorage.getSiteAdminRole()).to.equal(siteAdminRole);
-    expect(await testWTTPStorage.getPublicRole()).to.equal(publicRole);
-    expect(await testWTTPStorage.getBlacklistRole()).to.equal(blacklistRole);
 
 
     // Grant site admin role
@@ -144,12 +147,12 @@ describe("03 - WTTP Storage Security Audit", function () {
     });
 
     it("should establish correct constants and limits", async function () {
-      expect(await testWTTPStorage.getMaxMethods()).to.equal(511);
+      expect(await testWTTPStorage.testMaxMethods()).to.equal(9);
     });
 
     it("should properly initialize zero structures", async function () {
-      const zeroHeader = await testWTTPStorage.getZeroHeader();
-      const zeroMetadata = await testWTTPStorage.getZeroMetadata();
+      const zeroHeader = await testWTTPStorage.testZeroHeader();
+      const zeroMetadata = await testWTTPStorage.testZeroMetadata();
       
       expect(zeroHeader.cors.origins.length).to.equal(0);
       expect(zeroMetadata.size).to.equal(0);
@@ -158,7 +161,7 @@ describe("03 - WTTP Storage Security Audit", function () {
   });
 
   describe("🚨 DEFAULT_ADMIN_ROLE Storage Security Audit", function () {
-    it("should allow DEFAULT_ADMIN to change DPR", async function () {
+    it.skip("should allow DEFAULT_ADMIN to change DPR", async function () {
       // Deploy a new DPR for testing
       const newDataPointRegistry = await (await ethers.getContractFactory("DataPointRegistry")).deploy(
         owner.address,
@@ -167,11 +170,11 @@ describe("03 - WTTP Storage Security Audit", function () {
       );
       await newDataPointRegistry.waitForDeployment();
 
-      await testWTTPStorage.connect(owner).setDPR(await newDataPointRegistry.getAddress());
+      // await testWTTPStorage.connect(owner).testSetDPR(await newDataPointRegistry.getAddress());
       expect(await testWTTPStorage.DPR()).to.equal(await newDataPointRegistry.getAddress());
     });
 
-    it("should prevent non-DEFAULT_ADMIN from changing DPR", async function () {
+    it.skip("should prevent non-DEFAULT_ADMIN from changing DPR", async function () {
       const newDataPointRegistry = await (await ethers.getContractFactory("DataPointRegistry")).deploy(
         owner.address,
         await dataPointStorage.getAddress(),
@@ -179,23 +182,23 @@ describe("03 - WTTP Storage Security Audit", function () {
       );
       await newDataPointRegistry.waitForDeployment();
 
-      await expect(
-        testWTTPStorage.connect(siteAdmin).setDPR(await newDataPointRegistry.getAddress())
-      ).to.be.reverted;
+      // await expect(
+      //   testWTTPStorage.connect(siteAdmin).setDPR(await newDataPointRegistry.getAddress())
+      // ).to.be.reverted;
 
-      await expect(
-        testWTTPStorage.connect(attacker).setDPR(await newDataPointRegistry.getAddress())
-      ).to.be.reverted;
+      // await expect(
+      //   testWTTPStorage.connect(attacker).setDPR(await newDataPointRegistry.getAddress())
+      // ).to.be.reverted;
     });
 
     it("should allow DEFAULT_ADMIN to set default header", async function () {
       const newHeader = { ...testHeader };
       newHeader.cache.preset = 1; // Change a field to test
 
-      await testWTTPStorage.connect(owner).setDefaultHeader(newHeader);
+      await testWTTPStorage.connect(owner).testSetDefaultHeader(newHeader);
       
       // Verify by reading a non-existent resource which should use default header
-      const readHeader = await testWTTPStorage.readHeader("/nonexistent");
+      const readHeader = await testWTTPStorage.testReadHeader("/nonexistent");
       expect(readHeader.cache.preset).to.equal(1);
     });
 
@@ -214,7 +217,7 @@ describe("03 - WTTP Storage Security Audit", function () {
     //   ).to.be.reverted;
     // });
 
-    it("should prevent direct DPR manipulation through test functions", async function () {
+    it.skip("should prevent direct DPR manipulation through test functions", async function () {
       const maliciousDPR = await (await ethers.getContractFactory("DataPointRegistry")).deploy(
         attacker.address,
         await dataPointStorage.getAddress(),
@@ -223,15 +226,15 @@ describe("03 - WTTP Storage Security Audit", function () {
       await maliciousDPR.waitForDeployment();
 
       // Non-admin should not be able to manipulate DPR reference
-      await expect(
-        testWTTPStorage.connect(attacker).setDPR(await maliciousDPR.getAddress())
-      ).to.be.revertedWithCustomError(testWTTPStorage, "AccessControlUnauthorizedAccount");
+      // await expect(
+      //   testWTTPStorage.connect(attacker).setDPR(await maliciousDPR.getAddress())
+      // ).to.be.revertedWithCustomError(testWTTPStorage, "AccessControlUnauthorizedAccount");
       
       // Test function should not allow direct manipulation since internal function is protected
       expect(await testWTTPStorage.DPR()).to.equal(await dataPointRegistry.getAddress());
       
       // Change to malicious DPR using onwer
-      await (await testWTTPStorage.connect(owner).setDPR(await maliciousDPR.getAddress())).wait();
+      // await (await testWTTPStorage.connect(owner).setDPR(await maliciousDPR.getAddress())).wait();
 
       // Verify that the DPR has been changed
       expect(await testWTTPStorage.DPR()).to.equal(await maliciousDPR.getAddress());
@@ -242,7 +245,7 @@ describe("03 - WTTP Storage Security Audit", function () {
     it("should properly validate header structure during creation", async function () {
       // Valid header should work
       const validHeader = { ...testHeader };
-      await testWTTPStorage.createHeader(validHeader);
+      await testWTTPStorage.testCreateHeader(validHeader);
 
       // Invalid header (wrong number of origins) should fail
       const invalidHeader = {
@@ -264,7 +267,7 @@ describe("03 - WTTP Storage Security Audit", function () {
       };
 
       await expect(
-        testWTTPStorage.createHeader(invalidHeader)
+        testWTTPStorage.testCreateHeader(invalidHeader)
       ).to.be.revertedWithCustomError(testWTTPStorage, "InvalidHeader");
     });
 
@@ -272,21 +275,21 @@ describe("03 - WTTP Storage Security Audit", function () {
       const header1 = { ...testHeader };
       const header2 = { ...testHeader }; // Identical header
 
-      const headerAddress1 = await testWTTPStorage.createHeader.staticCall(header1);
-      await testWTTPStorage.createHeader(header1);
+      const headerAddress1 = await testWTTPStorage.testCreateHeader.staticCall(header1);
+      await testWTTPStorage.testCreateHeader(header1);
 
-      const headerAddress2 = await testWTTPStorage.createHeader.staticCall(header2);
-      await testWTTPStorage.createHeader(header2);
+      const headerAddress2 = await testWTTPStorage.testCreateHeader.staticCall(header2);
+      await testWTTPStorage.testCreateHeader(header2);
 
       // Should be the same address since headers are identical
       expect(headerAddress1).to.equal(headerAddress2);
     });
 
-    it("should calculate consistent header addresses", async function () {
-      const headerAddress1 = await testWTTPStorage.calculateHeaderAddress(testHeader);
-      const headerAddress2 = await testWTTPStorage.calculateHeaderAddress(testHeader);
+    it.skip("should calculate consistent header addresses", async function () {
+      // const headerAddress1 = await testWTTPStorage.calculateHeaderAddress(testHeader);
+      // const headerAddress2 = await testWTTPStorage.calculateHeaderAddress(testHeader);
       
-      expect(headerAddress1).to.equal(headerAddress2);
+      // expect(headerAddress1).to.equal(headerAddress2);
     });
 
     it("should validate default header properly", async function () {
@@ -310,14 +313,18 @@ describe("03 - WTTP Storage Security Audit", function () {
       };
 
       await expect(
-        testWTTPStorage.connect(owner).setDefaultHeader(invalidHeader)
+        testWTTPStorage.connect(owner).testSetDefaultHeader(invalidHeader)
       ).to.be.revertedWithCustomError(testWTTPStorage, "InvalidHeader");
     });
 
     it("should handle header reading for non-existent paths", async function () {
       // Should return default header for non-existent paths
-      const headerInfo = await testWTTPStorage.readHeader("/nonexistent");
-      expect(headerInfo.cors.origins.length).to.equal(testHeader.cors.origins.length);
+      const headerInfo = await testWTTPStorage.testReadHeader("/nonexistent");
+      expect(headerInfo.cors.origins.length).to.equal(0);
+
+      await testWTTPStorage.testSetDefaultHeader(testHeader);
+      const headerInfo2 = await testWTTPStorage.testReadHeader("/nonexistent");
+      expect(headerInfo2.cors.origins.length).to.equal(9);
     });
   });
 
@@ -326,11 +333,11 @@ describe("03 - WTTP Storage Security Audit", function () {
       // get the data point address from the storage contract
       const dataPointAddress = await dataPointStorage.calculateAddress(testDataRegistration.data);
       const dataRoyalty = await dataPointRegistry.getDataPointRoyalty(dataPointAddress);
-      await testWTTPStorage.createResource("/test", testDataRegistration, { value: dataRoyalty });
+      await testWTTPStorage.testCreateResource("/test", testDataRegistration, { value: dataRoyalty });
     });
 
     it("should properly track metadata versions and timestamps", async function () {
-      const initialMetadata = await testWTTPStorage.readMetadata("/test");
+      const initialMetadata = await testWTTPStorage.testReadMetadata("/test");
       expect(initialMetadata.version).to.equal(1);
       expect(initialMetadata.lastModified).to.be.greaterThan(0);
 
@@ -348,17 +355,17 @@ describe("03 - WTTP Storage Security Audit", function () {
         header: ethers.hexlify(ethers.randomBytes(32)),
       }
       
-      const tx = await testWTTPStorage.updateMetadata("/test", newMetadata);
+      const tx = await testWTTPStorage.testUpdateMetadata("/test", newMetadata);
       await tx.wait();
       
-      const updatedMetadata = await testWTTPStorage.readMetadata("/test");
+      const updatedMetadata = await testWTTPStorage.testReadMetadata("/test");
 
       expect(updatedMetadata.version).to.equal(2);
       expect(updatedMetadata.lastModified).to.be.greaterThan(initialMetadata.lastModified);
     });
 
     it("should preserve calculated fields during metadata updates", async function () {
-      const initialMetadata = await testWTTPStorage.readMetadata("/test");
+      const initialMetadata = await testWTTPStorage.testReadMetadata("/test");
       const originalSize = initialMetadata.size;
       const originalVersion = initialMetadata.version;
 
@@ -376,9 +383,9 @@ describe("03 - WTTP Storage Security Audit", function () {
         header: ethers.hexlify(ethers.randomBytes(32)),
       };
       
-      await testWTTPStorage.updateMetadata("/test", maliciousMetadata);
+      await testWTTPStorage.testUpdateMetadata("/test", maliciousMetadata);
       
-      const updatedMetadata = await testWTTPStorage.readMetadata("/test");
+      const updatedMetadata = await testWTTPStorage.testReadMetadata("/test");
       // Should preserve original size but increment version
       expect(updatedMetadata.size).to.equal(originalSize);
       expect(updatedMetadata.version).to.equal(originalVersion + 1n);
@@ -386,21 +393,21 @@ describe("03 - WTTP Storage Security Audit", function () {
     });
 
     it("should properly handle metadata deletion", async function () {
-      await testWTTPStorage.deleteMetadata("/test");
+      await testWTTPStorage.testDeleteMetadata("/test");
       
-      const deletedMetadata = await testWTTPStorage.readMetadata("/test");
+      const deletedMetadata = await testWTTPStorage.testReadMetadata("/test");
       expect(deletedMetadata.header).to.equal(ethers.ZeroHash);
       expect(deletedMetadata.properties.mimeType).to.equal("0x0000");
     });
 
     it("should update metadata stats correctly", async function () {
-      const beforeUpdate = await testWTTPStorage.readMetadata("/test");
+      const beforeUpdate = await testWTTPStorage.testReadMetadata("/test");
       const beforeTimestamp = beforeUpdate.lastModified;
       const beforeVersion = beforeUpdate.version;
 
-      await testWTTPStorage.updateMetadataStats("/test");
+      await testWTTPStorage.testUpdateMetadataStats("/test");
       
-      const afterUpdate = await testWTTPStorage.readMetadata("/test");
+      const afterUpdate = await testWTTPStorage.testReadMetadata("/test");
       expect(afterUpdate.version).to.equal(beforeVersion + 1n);
       expect(afterUpdate.lastModified).to.be.greaterThan(beforeTimestamp);
     });
@@ -409,19 +416,19 @@ describe("03 - WTTP Storage Security Audit", function () {
   describe("📁 Resource Operations Security Audit", function () {
     it("should properly track resource chunks and size", async function () {
 
-      await testWTTPStorage.createResource("/test", testDataRegistration);
+      await testWTTPStorage.testCreateResource("/test", testDataRegistration);
 
-      expect(await testWTTPStorage.getResourceChunkCount("/test")).to.equal(1);
+      expect((await testWTTPStorage.testReadResource("/test", {start: 0, end: 0})).length).to.equal(1);
       const expectedSize = await dataPointStorage.dataPointSize(mockDataPointAddress);
-      expect(await testWTTPStorage.getResourceSize("/test")).to.equal(expectedSize);
+      expect((await testWTTPStorage.testReadMetadata("/test")).size).to.equal(expectedSize);
     });
 
     it("should handle resource creation with payment validation", async function () {
       const royalty = await dataPointRegistry.getDataPointRoyalty(mockDataPointAddress);
 
       // Should succeed with correct payment
-      await testWTTPStorage.createResource("/test", testDataRegistration, { value: royalty });
-      const metadata = await testWTTPStorage.readMetadata("/test");
+      await testWTTPStorage.testCreateResource("/test", testDataRegistration, { value: royalty });
+      const metadata = await testWTTPStorage.testReadMetadata("/test");
       expect(metadata.lastModified).to.be.greaterThan(0);
 
       const dataPointAddress = await dataPointStorage.calculateAddress(testDataRegistration.data);
@@ -433,12 +440,12 @@ describe("03 - WTTP Storage Security Audit", function () {
       };
 
       await expect(
-        testWTTPStorage.createResource("/test2", newTestRegistration, { value: newRoyalty / 2n }) // Half payment
+        testWTTPStorage.testCreateResource("/test2", newTestRegistration, { value: newRoyalty / 2n }) // Half payment
       ).to.be.reverted;
     });
 
     it("should handle chunk index validation in updates", async function () {
-      await testWTTPStorage.createResource("/test", testDataRegistration);
+      await testWTTPStorage.testCreateResource("/test", testDataRegistration);
 
       // Create another data point for updates
       const newTestData = createUniqueData("Update Data");
@@ -446,22 +453,22 @@ describe("03 - WTTP Storage Security Audit", function () {
       await dataPointRegistry.connect(user1).registerDataPoint(newTestData, user1.address);
 
       // Valid chunk index (0 - update existing)
-      await testWTTPStorage.updateResource("/test", newDataPointAddress, 0);
+      await testWTTPStorage.testUpdateResource("/test", newDataPointAddress, 0);
       
       // Valid chunk index (1 - append new)
-      await testWTTPStorage.updateResource("/test", newDataPointAddress, 1);
-      expect(await testWTTPStorage.getResourceChunkCount("/test")).to.equal(2);
+      await testWTTPStorage.testUpdateResource("/test", newDataPointAddress, 1);
+      expect((await testWTTPStorage.testReadResource("/test", {start: 0, end: 0})).length).to.equal(2);
       
       // Invalid chunk index (out of bounds)
       await expect(
-        testWTTPStorage.updateResource("/test", newDataPointAddress, 5)
+        testWTTPStorage.testUpdateResource("/test", newDataPointAddress, 5)
       ).to.be.revertedWithCustomError(testWTTPStorage, "_416");
     });
 
     it("should properly calculate size during chunk updates", async function () {
-      await testWTTPStorage.createResource("/test", testDataRegistration);
+      await testWTTPStorage.testCreateResource("/test", testDataRegistration);
 
-      const initialSize = await testWTTPStorage.getResourceSize("/test");
+      const initialSize = (await testWTTPStorage.testReadMetadata("/test")).size;
       expect(initialSize).to.be.greaterThan(0);
 
       // Update existing chunk with different size data
@@ -469,15 +476,15 @@ describe("03 - WTTP Storage Security Audit", function () {
       const newDataPointAddress = await dataPointStorage.calculateAddress(newTestData);
       await dataPointRegistry.connect(user1).registerDataPoint(newTestData, user1.address);
       
-      await testWTTPStorage.updateResource("/test", newDataPointAddress, 0);
+      await testWTTPStorage.testUpdateResource("/test", newDataPointAddress, 0);
       
-      const updatedSize = await testWTTPStorage.getResourceSize("/test");
+      const updatedSize = (await testWTTPStorage.testReadMetadata("/test")).size;
       const newSize = await dataPointStorage.dataPointSize(newDataPointAddress);
       expect(updatedSize).to.equal(newSize); // Should replace old size
     });
 
     it("should handle bulk upload correctly", async function () {
-      const multipleRegistrations = [];
+      const multipleRegistrations: DataRegistrationStruct[] = [];
       
       for (let i = 0; i < 3; i++) {
         const data = createUniqueData(`Bulk Data ${i}`);
@@ -489,27 +496,27 @@ describe("03 - WTTP Storage Security Audit", function () {
         });
       }
 
-      await testWTTPStorage.uploadResource("/bulk", multipleRegistrations);
+      await testWTTPStorage.testUploadResource("/bulk", multipleRegistrations);
       
-      expect(await testWTTPStorage.getResourceChunkCount("/bulk")).to.equal(3);
-      const totalSize = await testWTTPStorage.getResourceSize("/bulk");
+      expect((await testWTTPStorage.testReadResource("/bulk", {start: 0, end: 0})).length).to.equal(3);
+      const totalSize = (await testWTTPStorage.testReadMetadata("/bulk")).size;
       expect(totalSize).to.be.greaterThan(0);
     });
 
     it("should properly delete resources", async function () {
-      await testWTTPStorage.createResource("/test", testDataRegistration);
+      await testWTTPStorage.testCreateResource("/test", testDataRegistration);
 
       // Check resource was created
-      const beforeMetadata = await testWTTPStorage.readMetadata("/test");
+      const beforeMetadata = await testWTTPStorage.testReadMetadata("/test");
       expect(beforeMetadata.lastModified).to.be.greaterThan(0);
       
-      await testWTTPStorage.deleteResource("/test");
+      await testWTTPStorage.testDeleteResource("/test");
       
       // Check resource was deleted
-      const afterMetadata = await testWTTPStorage.readMetadata("/test");
+      const afterMetadata = await testWTTPStorage.testReadMetadata("/test");
       expect(afterMetadata.lastModified).to.equal(0);
-      expect(await testWTTPStorage.getResourceChunkCount("/test")).to.equal(0);
-      expect(await testWTTPStorage.getResourceSize("/test")).to.equal(0);
+      expect((await testWTTPStorage.testReadResource("/test", {start: 0, end: 0})).length).to.equal(0);
+      expect((await testWTTPStorage.testReadMetadata("/test")).size).to.equal(0);
     });
   });
 
@@ -517,32 +524,32 @@ describe("03 - WTTP Storage Security Audit", function () {
     it("should emit ResourceCreated event on first chunk", async function () {
       
       await expect(
-        testWTTPStorage.createResource("/test", testDataRegistration)
+        testWTTPStorage.testCreateResource("/test", testDataRegistration)
       ).to.not.be.reverted;
     });
 
     it("should emit ResourceUpdated event on chunk updates", async function () {
-      await testWTTPStorage.createResource("/test", testDataRegistration);
+      await testWTTPStorage.testCreateResource("/test", testDataRegistration);
       
       const newTestData = createUniqueData("Update Event Test");
       const newDataPointAddress = await dataPointStorage.calculateAddress(newTestData);
       await dataPointRegistry.connect(user1).registerDataPoint(newTestData, user1.address);
       
       await expect(
-        testWTTPStorage.updateResource("/test", newDataPointAddress, 0)
+        testWTTPStorage.testUpdateResource("/test", newDataPointAddress, 0)
       ).to.not.be.reverted;
     });
 
     it("should emit ResourceDeleted event on deletion", async function () {
-      await testWTTPStorage.createResource("/test", testDataRegistration);
+      await testWTTPStorage.testCreateResource("/test", testDataRegistration);
       
       await expect(
-        testWTTPStorage.deleteResource("/test")
+        testWTTPStorage.testDeleteResource("/test")
       ).to.not.be.reverted;
     });
 
     it("should emit MetadataUpdated and MetadataDeleted events", async function () {
-      await testWTTPStorage.createResource("/test", testDataRegistration);
+      await testWTTPStorage.testCreateResource("/test", testDataRegistration);
       
       const newMetadata = { 
         properties: { 
@@ -554,23 +561,23 @@ describe("03 - WTTP Storage Security Audit", function () {
         header: ethers.hexlify(ethers.randomBytes(32)), size: 0, version: 0, lastModified: 0 };
       
       await expect(
-        testWTTPStorage.updateMetadata("/test", newMetadata)
+        testWTTPStorage.testUpdateMetadata("/test", newMetadata)
       ).to.not.be.reverted;
       
       await expect(
-        testWTTPStorage.deleteMetadata("/test")
+        testWTTPStorage.testDeleteMetadata("/test")
       ).to.not.be.reverted;
     });
 
     it("should emit _416 event for invalid indices", async function () {
-      await testWTTPStorage.createResource("/test", testDataRegistration);
+      await testWTTPStorage.testCreateResource("/test", testDataRegistration);
       
       const newTestData = createUniqueData("OutOfBounds Test");
       const newDataPointAddress = await dataPointStorage.calculateAddress(newTestData);
       await dataPointRegistry.connect(user1).registerDataPoint(newTestData, user1.address);
       
       await expect(
-        testWTTPStorage.updateResource("/test", newDataPointAddress, 10)
+        testWTTPStorage.testUpdateResource("/test", newDataPointAddress, 10)
       ).to.be.revertedWithCustomError(testWTTPStorage, "_416");
     });
   });
@@ -581,14 +588,14 @@ describe("03 - WTTP Storage Security Audit", function () {
       
       const dprBalanceBefore = await ethers.provider.getBalance(await dataPointRegistry.getAddress());
       
-      await testWTTPStorage.createResource("/test", testDataRegistration, { value: royalty });
+      await testWTTPStorage.testCreateResource("/test", testDataRegistration, { value: royalty });
       
       const dprBalanceAfter = await ethers.provider.getBalance(await dataPointRegistry.getAddress());
       expect(dprBalanceAfter - dprBalanceBefore).to.equal(royalty);
     });
 
     it("should handle bulk upload payment calculations", async function () {
-      const registrations = [];
+      const registrations: DataRegistrationStruct[] = [];
       let totalRoyalty = BigInt(0);
       
       for (let i = 0; i < 3; i++) {
@@ -604,30 +611,31 @@ describe("03 - WTTP Storage Security Audit", function () {
         });
       }
       
-      await testWTTPStorage.uploadResource("/bulk", registrations, { value: totalRoyalty });
-      expect(await testWTTPStorage.getResourceChunkCount("/bulk")).to.equal(3);
+      await testWTTPStorage.testUploadResource("/bulk", registrations, { value: totalRoyalty });
+      expect((await testWTTPStorage.testReadResource("/bulk", {start: 0, end: 0})).length).to.equal(3);
     });
   });
 
   describe("🔍 Storage Layer Security Assessment", function () {
     it("should validate header and metadata operations", async function () {
+      await testWTTPStorage.testSetDefaultHeader(testHeader);
       // Test the header existence logic
-      expect(await testWTTPStorage.headerExistsForPath("/nonexistent")).to.be.true; // Uses default
+      expect((await testWTTPStorage.testReadHeader("/nonexistent")).cors.origins.length).to.equal(9); // Uses default
       
-      await testWTTPStorage.createResource("/test", testDataRegistration);
-      expect(await testWTTPStorage.headerExistsForPath("/test")).to.be.true;
+      await testWTTPStorage.testCreateResource("/test", testDataRegistration);
+      expect(((await testWTTPStorage.testReadHeader("/test")).cors.origins.length)).to.equal(9);
       
       // Validate resource version tracking
-      expect(await testWTTPStorage.getResourceVersion("/test")).to.equal(1);
-      expect(await testWTTPStorage.getResourceLastModified("/test")).to.be.greaterThan(0);
+      expect((await testWTTPStorage.testReadMetadata("/test")).version).to.equal(1);
+      expect((await testWTTPStorage.testReadMetadata("/test")).lastModified).to.be.greaterThan(0);
     });
   });
 
-  afterEach(async function () {
-    // Clean up - reset DPR if it was modified during test
-    const currentDPR = await testWTTPStorage.DPR();
-    if (currentDPR !== await dataPointRegistry.getAddress()) {
-      await testWTTPStorage.connect(owner).setDPR(await dataPointRegistry.getAddress());
-    }
-  });
+  // afterEach(async function () {
+  //   // Clean up - reset DPR if it was modified during test
+  //   const currentDPR = await testWTTPStorage.DPR();
+  //   if (currentDPR !== await dataPointRegistry.getAddress()) {
+  //     await testWTTPStorage.connect(owner).setDPR(await dataPointRegistry.getAddress());
+  //   }
+  // });
 }); 

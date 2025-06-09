@@ -16,13 +16,14 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+/// !interface copyright "Copyright (C) 2025 TechnicallyWeb3"
+/// !interface build ./interfaces/IDataPointStorage.sol
+
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.20;
 
-/// !interface build ./interfaces/IDataPointStorage.sol
-/// !interface import "../types/ESPTypes.sol";
-
 import "./types/ESPTypes.sol";
+/// !interface import "../types/ESPTypes.sol"
 
 /// @title Data Point Storage Contract
 /// @notice Provides core storage functionality for data points

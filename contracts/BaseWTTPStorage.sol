@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.20;
 
+/// !interface build ./interfaces/IBaseWTTPStorage.sol
+
+/// !interface import "./IBaseWTTPPermissions.sol";
+/// !interface replace BaseWTTPPermissions with IBaseWTTPPermissions
+
 import "./BaseWTTPPermissions.sol";
 
 /// @title WTTP Base Storage Contract
@@ -34,7 +39,7 @@ abstract contract BaseWTTPStorage is BaseWTTPPermissions {
 
     /// @return IDataPointStorage The Data Point Storage contract
     function DPS() public view virtual returns (IDataPointStorage) {
-        return DPR_.DPS_();
+        return DPR_.DPS();
     }
 
     /// @notice Returns the Data Point Registry contract instance
@@ -106,7 +111,7 @@ abstract contract BaseWTTPStorage is BaseWTTPPermissions {
         // must check redirect code to prevent fake status code injection
         uint16 _redirectCode = _header.redirect.code;
         if (_redirectCode !=0 && (_redirectCode < 300 || _redirectCode > 310)) {
-            revert _3xx(_header.redirect);
+            revert InvalidHeader(_header);
         }
 
         // removed automated building of empty origins array to cut bulk
@@ -260,7 +265,7 @@ abstract contract BaseWTTPStorage is BaseWTTPPermissions {
         string memory _path,
         Range memory _range
     ) internal virtual view returns (bytes32[] memory) { 
-        Range memory _normalizedRange = _normalizeRange(_range, _resourceDataPoints(_path));
+        Range memory _normalizedRange = normalizeRange_(_range, _resourceDataPoints(_path));
         uint256 _resourceLength = uint256(_normalizedRange.end - _normalizedRange.start + 1);
         bytes32[] memory _dataPoints = new bytes32[](_resourceLength);
         for (uint256 i = 0; i < _resourceLength; i++) {

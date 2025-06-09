@@ -1,18 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.20;
 
-/// !interface build ./contracts/interfaces/IWTTPPermissions.sol
+/// !interface build ./interfaces/IBaseWTTPPermissions.sol
+
+/// !interface import "@openzeppelin/contracts/access/IAccessControl.sol";
+/// !interface import "@wttp/core/contracts/types/WTTPTypes.sol";
+/// !interface replace AccessControl with IAccessControl
+/// !interface exclude hasRole
+// this shouldn't be needed, overrides should automatically be excluded by hardhat-build
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-/// !interface import "@openzeppelin/contracts/access/IAccessControl.sol";
-import "@wttp/core/contracts/interfaces/WTTPTypes.sol";
-/// !interface import "@wttp/core/contracts/interfaces/WTTPTypes.sol";
+import "@wttp/core/contracts/types/WTTPTypes.sol";
 
 /// @title WTTP Permissions Contract
 /// @notice Manages role-based access control for the WTTP protocol
 /// @dev Extends OpenZeppelin's AccessControl with site-specific roles and custom permission logic
 abstract contract BaseWTTPPermissions is AccessControl { 
-/// !interface replace AccessControl with IAccessControl
 
     /// @notice Role identifier for site administrators
     /// @dev Calculated via keccak256 during construction. Site admins have elevated privileges but below the DEFAULT_ADMIN_ROLE
