@@ -84,6 +84,10 @@ abstract contract BaseWTTPSite is BaseWTTPStorage {
         return _readMetadata(_path).lastModified > 0;
     }
 
+    function _isImmutable(string memory _path) internal view virtual returns (bool) {
+        return _readHeader(_path).cache.immutableFlag && _readMetadata(_path).version > 0;
+    }
+
     /// @notice Restricts function access to resource administrators
     /// @dev Reverts with Forbidden error if caller lacks appropriate permissions
     /// @param _path Resource path being accessed
@@ -91,6 +95,11 @@ abstract contract BaseWTTPSite is BaseWTTPStorage {
         if (!_methodAllowed(_path, _method)) {
             revert _405("Method Not Allowed", _readHeader(_path).cors.methods, _readHeader(_path).cache.immutableFlag);
         }
+
+        if (_isImmutable(_path)) {
+            revert _405("Resource Immutable", _readHeader(_path).cors.methods, true);
+        }
+
         if (!(
             _method == Method.PUT || 
             _method == Method.DEFINE || 
@@ -294,7 +303,6 @@ abstract contract BaseWTTPSite is BaseWTTPStorage {
         } else {
             _status = 204; // No Content
         }
-        ResourceMetadata memory _metadata = _readMetadata(_path);
         _updateMetadata(
             _path, 
             ResourceMetadata({
@@ -302,15 +310,16 @@ abstract contract BaseWTTPSite is BaseWTTPStorage {
                 size: 0, // calculated during upload
                 version: 0, // calculated during upload
                 lastModified: 0, // calculated during upload
-                header: _metadata.header // preserve header
+                header: _readMetadata(_path).header // preserve header
             })
         );
 
+        ResourceMetadata memory _metadata = _readMetadata(_path);
         bytes32[] memory _dataPoints = _getDataPoints(_data);
 
         putResponse.head = HEADResponse({
             status: _status,
-            metadata: _metadata,
+            metadata: _metadata, // use updated metadata
             headerInfo: _readHeader(_path),
             etag: calculateEtag(_metadata, _dataPoints)
         });
@@ -330,15 +339,13 @@ abstract contract BaseWTTPSite is BaseWTTPStorage {
         _OPTIONS(_path, Method.PATCH);
         DataRegistration[] memory _data = patchRequest.data;
 
-        patchResponse.dataPoints = _uploadResource(
+        bytes32[] memory _dataPoints = _uploadResource(
             _path, 
             _data
         );
 
-        bytes32[] memory _dataPoints = _getDataPoints(_data);
-
-        patchResponse.head = _HEAD(patchRequest.head, Method.PATCH);
-        patchResponse.head.status = contentCode_(_data.length, _getDataPoints(_data).length);
+        patchResponse.head = _HEAD(patchRequest.head, Method.HEAD);
+        patchResponse.head.status = contentCode_(_dataPoints.length, _resourceDataPoints(_path));
         patchResponse.dataPoints = _dataPoints;
 
         emit PATCHSuccess(msg.sender, patchResponse);

@@ -43,4 +43,15 @@ contract TestWTTPSite is BaseWTTPSite {
         return _GET(getRequest, _method);
     }
     
+    function testNormalizeRange(Range memory range, uint256 size) public pure returns (Range memory) {
+        return normalizeRange_(range, size);
+    }
+
+    function testCalculateEtag(ResourceMetadata memory metadata, bytes32[] memory dataPoints) public pure returns (bytes32) {
+        return calculateEtag(metadata, dataPoints);
+    }
+
+    function testGetResourceEtag(string memory path) public view returns (bytes32) {
+        return _HEAD(HEADRequest({path: path, ifModifiedSince: 0, ifNoneMatch: bytes32(0)}), Method.HEAD).etag;
+    }
 }
