@@ -5,7 +5,7 @@ import "../BaseWTTPSite.sol";
 
 contract WTTPErrorSite {
 
-    BaseWTTPSite public immutable site;
+    TestWTTPSite public immutable site;
 
     constructor(address _siteAddress) {
         // site = IWTTPBaseSite(_siteAddress);

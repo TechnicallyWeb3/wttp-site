@@ -11,7 +11,7 @@ import "./BaseWTTPStorage.sol";
 /// @title WTTP Base Site Contract
 /// @notice Implements core WTTP protocol methods for HTTP-like operations on blockchain
 /// @dev Extends WTTPBaseStorage to provide web-like interactions with blockchain resources
-abstract contract BaseWTTPSite is BaseWTTPStorage {
+abstract contract TestWTTPSite is BaseWTTPStorage {
 
     constructor(
         address _owner,
@@ -344,7 +344,7 @@ abstract contract BaseWTTPSite is BaseWTTPStorage {
             _data
         );
 
-        patchResponse.head = _HEAD(patchRequest.head, Method.HEAD);
+        patchResponse.head = _HEAD(patchRequest.head, Method.PATCH);
         patchResponse.head.status = contentCode_(_dataPoints.length, _resourceDataPoints(_path));
         patchResponse.dataPoints = _dataPoints;
 
