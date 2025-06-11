@@ -102,17 +102,45 @@ export function bytes2ToMimeType(bytes2Value: string): string {
   return bytes2ToMimeMap[bytes2Value] || 'application/octet-stream'; // Default to binary stream
 }
 
-// Main upload function
+// Main upload function with enhanced error handling and validation
 export async function uploadFile(
   wtppSite: Web3Site,
   sourcePath: string,
   destinationPath: string
 ) {
-  console.log(`Uploading ${sourcePath} to ${destinationPath}...`);
+  console.log(`🚀 Starting upload: ${sourcePath} → ${destinationPath}`);
   
-  // Read file
-  const fileData = fs.readFileSync(sourcePath);
-  console.log(`File size: ${fileData.length} bytes`);
+  // Parameter validation
+  if (!wtppSite) {
+    throw new Error("Web3Site contract instance is required");
+  }
+  if (!sourcePath || !destinationPath) {
+    throw new Error("Both source and destination paths are required");
+  }
+  if (!fs.existsSync(sourcePath)) {
+    throw new Error(`Source file does not exist: ${sourcePath}`);
+  }
+  if (!fs.statSync(sourcePath).isFile()) {
+    throw new Error(`Source path is not a file: ${sourcePath}`);
+  }
+  
+  // Read file with error handling
+  let fileData: Buffer;
+  try {
+    fileData = fs.readFileSync(sourcePath);
+  } catch (error) {
+    throw new Error(`Failed to read file ${sourcePath}: ${error}`);
+  }
+  
+  console.log(`📁 File size: ${fileData.length} bytes`);
+  
+  // Validate file size
+  if (fileData.length === 0) {
+    throw new Error("Cannot upload empty file");
+  }
+  if (fileData.length > 100 * 1024 * 1024) { // 100MB limit
+    console.warn("⚠️  Large file detected (>100MB). Upload may take significant time and gas.");
+  }
   
   // Chunk the data
   const chunks = chunkData(fileData, CHUNK_SIZE);
@@ -144,29 +172,38 @@ export async function uploadFile(
     publisher: signerAddress
   }));
 
-  let royalty = [0n];
+  // FIXED: Initialize royalty array with correct size to prevent index errors
+  let royalty = new Array(dataRegistrations.length).fill(0n);
+  
+  // Get the DPS and DPR contracts once for efficiency
+  const dpsAddress = await wtppSite.DPS();
+  const dps = await ethers.getContractAt("DataPointStorage", dpsAddress);
+  const dprAddress = await wtppSite.DPR();
+  const dpr = await ethers.getContractAt("DataPointRegistry", dprAddress);
+  
+  let totalRoyalty = 0n;
   
   // Check royalties for each chunk before uploading
+  console.log(`📊 Calculating royalties for ${dataRegistrations.length} chunks...`);
   for (let i = 0; i < dataRegistrations.length; i++) {
     const chunk = dataRegistrations[i];
-    
-    // Get the DPS contract
-    const dpsAddress = await wtppSite.DPS();
-    const dps = await ethers.getContractAt("DataPointStorage", dpsAddress);
     
     // Calculate the data point address
     const dataPointAddress = await dps.calculateAddress(chunk.data);
     
-    // Get the DPR contract
-    const dprAddress = await wtppSite.DPR();
-    const dpr = await ethers.getContractAt("DataPointRegistry", dprAddress);
-    
     // Get the royalty
     royalty[i] = await dpr.getDataPointRoyalty(dataPointAddress);
+    totalRoyalty += royalty[i];
     
-    console.log(`Chunk ${i}: Royalty required: ${ethers.formatEther(royalty[i])} ETH`);
-    
-    // You could add logic here to decide whether to proceed based on royalty amount
+    console.log(`Chunk ${i + 1}/${dataRegistrations.length}: ${ethers.formatEther(royalty[i])} ETH`);
+  }
+  
+  console.log(`💰 Total royalty required: ${ethers.formatEther(totalRoyalty)} ETH`);
+  
+  // Check if user has sufficient balance
+  const balance = await ethers.provider.getBalance(signerAddress);
+  if (balance < totalRoyalty) {
+    throw new Error(`Insufficient balance. Required: ${ethers.formatEther(totalRoyalty)} ETH, Available: ${ethers.formatEther(balance)} ETH`);
   }
   
   let startIndex = 0;
@@ -195,17 +232,23 @@ export async function uploadFile(
     startIndex = 1;
   }
 
+  // Upload remaining chunks with progress reporting
   for (let i = startIndex; i < dataRegistrations.length; i++) {
-    // Use PATCH to update existing resource
-    console.log("Resource exists, using PATCH to update...");
-    const patchRequest = {
-      head: headRequest,
-      data: [dataRegistrations[i]]
-    };
-  
-    const tx = await wtppSite.PATCH(patchRequest, { value: royalty[i] });
-    await tx.wait();
-    console.log("File updated successfully!");
+    console.log(`📤 Uploading chunk ${i + 1}/${dataRegistrations.length} (${Math.round((i + 1) / dataRegistrations.length * 100)}%)`);
+    
+    try {
+      const patchRequest = {
+        head: headRequest,
+        data: [dataRegistrations[i]]
+      };
+    
+      const tx = await wtppSite.PATCH(patchRequest, { value: royalty[i] });
+      await tx.wait();
+      console.log(`✅ Chunk ${i + 1} uploaded successfully (${ethers.formatEther(royalty[i])} ETH)`);
+    } catch (error) {
+      console.error(`❌ Failed to upload chunk ${i + 1}:`, error);
+      throw new Error(`Upload failed at chunk ${i + 1}: ${error}`);
+    }
   }
 
   

@@ -17,16 +17,33 @@ interface SiteDeploymentData {
 }
 
 /**
- * Add a new deployment to the WTTP Site deployment registry
+ * Add a new deployment to the WTTP Site deployment registry with enhanced validation
  */
 export async function addSiteDeployment(deploymentData: SiteDeploymentData): Promise<void> {
-  // Skip hardhat chain
+  // Parameter validation
+  if (!deploymentData) {
+    throw new Error("Deployment data is required");
+  }
+  if (!deploymentData.siteName || !deploymentData.chainId || !deploymentData.site) {
+    throw new Error("Invalid deployment data: siteName, chainId, and site are required");
+  }
+  if (!deploymentData.site.contractAddress) {
+    throw new Error("Contract address is required");
+  }
+
+  // Skip hardhat chain with better logging
   if (deploymentData.chainId === 31337) {
-    console.log(`🚫 Skipping deployment registry update for chainId ${deploymentData.chainId}`);
+    console.log(`🚫 Skipping deployment registry update for local testing chain (${deploymentData.chainId})`);
     return;
   }
 
+  console.log(`📝 Adding deployment to registry: ${deploymentData.siteName} on chain ${deploymentData.chainId}`);
   const registryPath = path.join(__dirname, '..', 'site.deployments.ts');
+  
+  // Validate registry file exists
+  if (!fs.existsSync(registryPath)) {
+    throw new Error(`Registry file not found: ${registryPath}`);
+  }
   
   try {
     // Read current registry

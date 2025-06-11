@@ -23,10 +23,29 @@ export async function fetchResourceFromSite(
     chainId?: number
   } = {}
 ) {
+  // Parameter validation
+  if (!siteAddress) {
+    throw new Error("Site address is required");
+  }
+  if (!path) {
+    throw new Error("Resource path is required");
+  }
+  if (!path.startsWith('/')) {
+    throw new Error("Resource path must start with '/'");
+  }
+  
   const { ifModifiedSince = 0, ifNoneMatch = ethers.ZeroHash, headRequest = false, chainId } = options;
 
-  // Get the site contract
-  const siteContract = await ethers.getContractAt("Web3Site", siteAddress) as Web3Site;
+  console.log(`🌐 Connecting to site: ${siteAddress}`);
+  console.log(`📄 Requesting resource: ${path}${headRequest ? ' (HEAD only)' : ''}`);
+
+  // Get the site contract with error handling
+  let siteContract: Web3Site;
+  try {
+    siteContract = await ethers.getContractAt("Web3Site", siteAddress) as Web3Site;
+  } catch (error) {
+    throw new Error(`Failed to connect to site contract at ${siteAddress}: ${error}`);
+  }
 
   // Create the request - updated to new structure without requestLine wrapper
   const headRequest_obj = {
@@ -91,7 +110,12 @@ export async function readDataPointsContent(
   dataPoints: string[],
   chainId?: number
 ): Promise<Uint8Array> {
-  console.log(`Reading content from ${dataPoints.length} datapoints...`);
+  console.log(`📥 Reading content from ${dataPoints.length} datapoints...`);
+  
+  // Parameter validation
+  if (!siteAddress || !dataPoints || dataPoints.length === 0) {
+    throw new Error("Valid site address and datapoints array required");
+  }
   
   // Get the site contract to access DPS
   const siteContract = await ethers.getContractAt("Web3Site", siteAddress) as Web3Site;
@@ -100,34 +124,41 @@ export async function readDataPointsContent(
   // Get the DPS contract
   const dpsContract = await ethers.getContractAt("DataPointStorage", dpsAddress);
   
-  // Read all datapoints and combine their content
+  // Read all datapoints and combine their content with progress reporting
   const contents: Uint8Array[] = [];
+  let totalBytesRead = 0;
   
   for (let i = 0; i < dataPoints.length; i++) {
     const dataPointAddress = dataPoints[i];
-    console.log(`Reading datapoint ${i + 1}/${dataPoints.length}: ${dataPointAddress}`);
+    const progress = Math.round(((i + 1) / dataPoints.length) * 100);
+    console.log(`📊 Reading chunk ${i + 1}/${dataPoints.length} (${progress}%): ${dataPointAddress.substring(0, 10)}...`);
     
     try {
       // Read the datapoint content
       const dataPointContent = await dpsContract.readDataPoint(dataPointAddress);
-      contents.push(new Uint8Array(dataPointContent));
+      const chunk = new Uint8Array(dataPointContent);
+      contents.push(chunk);
+      totalBytesRead += chunk.length;
+      
+      console.log(`✅ Chunk ${i + 1} read: ${chunk.length} bytes`);
     } catch (error) {
-      console.error(`Failed to read datapoint ${dataPointAddress}:`, error);
-      throw new Error(`Failed to read datapoint ${i}: ${error}`);
+      console.error(`❌ Failed to read datapoint ${dataPointAddress}:`, error);
+      throw new Error(`Failed to read datapoint ${i + 1}/${dataPoints.length}: ${error}`);
     }
   }
   
-  // Combine all content chunks
-  const totalLength = contents.reduce((sum, chunk) => sum + chunk.length, 0);
-  const combined = new Uint8Array(totalLength);
+  // Combine all content chunks with optimized allocation
+  console.log(`🔗 Combining ${dataPoints.length} chunks (${totalBytesRead} total bytes)...`);
+  const combined = new Uint8Array(totalBytesRead);
   
   let offset = 0;
-  for (const chunk of contents) {
+  for (let i = 0; i < contents.length; i++) {
+    const chunk = contents[i];
     combined.set(chunk, offset);
     offset += chunk.length;
   }
   
-  console.log(`Successfully read ${combined.length} total bytes from ${dataPoints.length} datapoints`);
+  console.log(`✅ Successfully reconstructed ${combined.length} bytes from ${dataPoints.length} chunks`);
   return combined;
 }
 

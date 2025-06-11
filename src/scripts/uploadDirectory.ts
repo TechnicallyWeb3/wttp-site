@@ -94,14 +94,24 @@ function createDirectoryMetadata(dirPath: string, basePath: string): Record<stri
   return { "directory": directoryMetadata };
 }
 
-// Main upload directory function
+// Main upload directory function with enhanced error handling and validation
 export async function uploadDirectory(
   wtppSite: Web3Site,
   sourcePath: string,
   destinationPath: string
 ) {
-  console.log(`Uploading directory ${sourcePath} to ${destinationPath}...`);
+  console.log(`🚀 Starting directory upload: ${sourcePath} → ${destinationPath}`);
   
+  // Parameter validation
+  if (!wtppSite) {
+    throw new Error("Web3Site contract instance is required");
+  }
+  if (!sourcePath || !destinationPath) {
+    throw new Error("Both source and destination paths are required");
+  }
+  if (!fs.existsSync(sourcePath)) {
+    throw new Error(`Source directory does not exist: ${sourcePath}`);
+  }
   if (!isDirectory(sourcePath)) {
     throw new Error(`Source path ${sourcePath} is not a directory`);
   }
@@ -164,11 +174,13 @@ export async function uploadDirectory(
     publisher: signerAddress
   }));
   
-  let royalty = [0n];
+  // FIXED: Initialize royalty array with correct size to prevent index errors
+  let royalty = new Array(dataRegistrations.length).fill(0n);
   
   // Check royalties for the first chunk
   const dataPointAddress = await dps.calculateAddress(dataRegistrations[0].data);
   royalty[0] = await dpr.getDataPointRoyalty(dataPointAddress);
+  console.log(`💰 Directory metadata royalty: ${ethers.formatEther(royalty[0])} ETH`);
   
   // Check if the directory already exists
   if (resourceExists) {
@@ -276,15 +288,25 @@ export async function uploadDirectory(
   // Clean up the temporary file
   fs.unlinkSync(tempMetadataPath);
   
-  // Upload all files in the directory
+  // Upload all files in the directory with progress reporting
   const allFiles = getAllFiles(sourcePath);
+  console.log(`📁 Found ${allFiles.length} files to upload`);
   
-  for (const file of allFiles) {
+  for (let i = 0; i < allFiles.length; i++) {
+    const file = allFiles[i];
     const relativePath = path.relative(sourcePath, file);
     const destinationFilePath = path.join(destinationPath, relativePath).replace(/\\/g, '/');
+    const progress = Math.round(((i + 1) / allFiles.length) * 100);
     
-    console.log(`Uploading file ${file} to ${destinationFilePath}...`);
-    await uploadFile(wtppSite, file, destinationFilePath);
+    console.log(`📤 Uploading file ${i + 1}/${allFiles.length} (${progress}%): ${relativePath}`);
+    
+    try {
+      await uploadFile(wtppSite, file, destinationFilePath);
+      console.log(`✅ File uploaded successfully: ${relativePath}`);
+    } catch (error) {
+      console.error(`❌ Failed to upload file ${relativePath}:`, error);
+      throw new Error(`Failed to upload file ${relativePath}: ${error}`);
+    }
   }
   
   // Create all subdirectories
