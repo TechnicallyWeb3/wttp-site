@@ -9,6 +9,7 @@ pragma solidity ^0.8.20;
 import "./BaseWTTPStorage.sol";
 
 /// @title WTTP Base Site Contract
+/// @author Web3 Transfer Protocol (WTTP) Development Team
 /// @notice Implements core WTTP protocol methods for HTTP-like operations on blockchain
 /// @dev Extends WTTPBaseStorage to provide web-like interactions with blockchain resources
 abstract contract BaseWTTPSite is BaseWTTPStorage {
@@ -210,13 +211,18 @@ abstract contract BaseWTTPSite is BaseWTTPStorage {
         string memory _path = getRequest.head.path;
         getResponse.head = _HEAD(getRequest.head, _method); // includes error check
         
+        // design choice, do we allow content to be returned even if the resource is not found?
+        // if so all we need to do is add this datapoint to the 500 code check. 
         bytes32[] memory _dataPoints = _readResource(_path, getRequest.rangeChunks);
         getResponse.dataPoints = _dataPoints;
-        uint256 _resourceSize = _resourceDataPoints(_path);
-        getResponse.head.status = contentCode_(
-            _dataPoints.length, 
-            _resourceSize
-        );
+
+        if (getResponse.head.status == 500) {
+            uint256 _resourceSize = _resourceDataPoints(_path);
+            getResponse.head.status = contentCode_(
+                _dataPoints.length, 
+                _resourceSize
+            );
+        }
     }
 
     /// @notice Handles GET requests to retrieve resource content locations

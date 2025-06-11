@@ -9,6 +9,7 @@ pragma solidity ^0.8.20;
 import "./BaseWTTPPermissions.sol";
 
 /// @title WTTP Base Storage Contract
+/// @author Web3 Transfer Protocol (WTTP) Development Team
 /// @notice Manages web resource storage and access control
 /// @dev Core storage functionality for the WTTP protocol, inheriting permission management
 ///      Resources are stored as chunks of data points with associated metadata and headers

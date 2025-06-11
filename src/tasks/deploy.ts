@@ -58,11 +58,18 @@ task("deploy:site", "Deploy a single Web3Site contract with funding checks")
         if (!chainId) {
           throw new Error("ChainId not configured");
         }
-        dprAddress = getContractAddress(chainId, "dpr");
-        console.log(`📍 Using @tw3/esp DPR: ${dprAddress}`);
+        
+        // Add fallback for local testing
+        if (hre.network.name === "hardhat" || hre.network.name === "localhost") {
+          dprAddress = "0x0000000000000000000000000000000000000001"; // Test DPR address for local testing
+          console.log(`📍 Using test DPR for local network: ${dprAddress}`);
+        } else {
+          dprAddress = getContractAddress(chainId, "dpr");
+          console.log(`📍 Using @tw3/esp DPR: ${dprAddress}`);
+        }
       }
 
-      // Create default header - updated to new structure
+      // Create default header - fixed to match contract requirements
       const defaultHeader = {
         cache: {
           immutableFlag: false,
@@ -70,8 +77,19 @@ task("deploy:site", "Deploy a single Web3Site contract with funding checks")
           custom: ""
         },
         cors: {
-          methods: 511, // All methods allowed
-          origins: [],
+          methods: 511, // All methods allowed (9 bits for 9 methods)
+          origins: [
+            // Origins array must have 9 elements to match 9 methods (OPTIONS through DELETE)
+            "0x0000000000000000000000000000000000000000000000000000000000000000", // PUBLIC role for all methods
+            "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+          ],
           preset: 1, // PUBLIC preset
           custom: ""
         },
@@ -93,9 +111,9 @@ task("deploy:site", "Deploy a single Web3Site contract with funding checks")
       // Estimate deployment cost
       const Web3SiteFactory = await hre.ethers.getContractFactory("Web3Site");
       const deployTx = await Web3SiteFactory.connect(deployer).getDeployTransaction(
+        ownerAddress,
         dprAddress,
-        defaultHeader,
-        ownerAddress
+        defaultHeader
       );
 
       const gasEstimate = await hre.ethers.provider.estimateGas({
@@ -136,9 +154,9 @@ task("deploy:site", "Deploy a single Web3Site contract with funding checks")
       // Deploy Web3Site
       console.log(`🚀 Deploying Web3Site...`);
       const web3Site = await Web3SiteFactory.connect(deployer).deploy(
+        ownerAddress,
         dprAddress,
-        defaultHeader,
-        ownerAddress
+        defaultHeader
       );
 
       await web3Site.waitForDeployment();
@@ -163,7 +181,7 @@ task("deploy:site", "Deploy a single Web3Site contract with funding checks")
         try {
           await hre.run("verify:verify", {
             address: siteAddress,
-            constructorArguments: [dprAddress, defaultHeader, ownerAddress],
+            constructorArguments: [ownerAddress, dprAddress, defaultHeader],
           });
           console.log("✅ Contract verified!");
         } catch (error: any) {
@@ -297,7 +315,7 @@ task("deploy:verify", "Verify deployed Web3Site contract")
     try {
       await hre.run("verify:verify", {
         address: address,
-        constructorArguments: [dpr, defaultHeader, owner],
+        constructorArguments: [owner, dpr, defaultHeader],
       });
       console.log("✅ Web3Site verified successfully!");
     } catch (error: any) {

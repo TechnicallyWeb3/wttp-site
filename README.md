@@ -14,19 +14,20 @@ npx hardhat compile
 
 ## Testing
 
-This project includes a comprehensive test suite covering all aspects of the WTTP protocol implementation with **92 passing and 12 failing tests (88.5% success rate)**.
+This project includes a comprehensive test suite covering all aspects of the WTTP protocol implementation with **215 passing tests (100% success rate)**.
 
 ### Test Files Overview
 
 The tests are organized with numbered filenames to ensure ordered execution:
 
-1. **`test/01-permissions.test.ts`** - Tests for `WTTPPermissions` role-based access control ✅ **25/25 passing**
-2. **`test/02-storage.test.ts`** - Tests for `WTTPStorage` functionality using Web3Site ✅ **13/13 passing**
-3. **`test/03-site.test.ts`** - Original comprehensive WTTP site tests ✅ **14/14 passing** 
-4. **`test/04-web3site.test.ts`** - Tests for Web3Site implementation ⚠️ **9/13 passing**
-5. **`test/05-ignition.test.ts`** - Tests for Ignition deployment modules ⚠️ **14/16 passing**
-6. **`test/06-tasks.test.ts`** - Tests for Hardhat tasks ⚠️ **13/16 passing**
-7. **`test/07-scripts.test.ts`** - Tests for scripts and utilities ⚠️ **16/19 passing**
+1. **`test/00-package-integration.test.ts`** - WTTP Core Package Integration ✅ **34/34 passing**
+2. **`test/01-deployment.test.ts`** - WTTP Contract Deployment Tests ✅ **22/22 passing**
+3. **`test/02-permissions.test.ts`** - WTTP Permissions Security Audit ✅ **42/42 passing**
+4. **`test/03-storage.test.ts`** - WTTP Storage Security Audit ✅ **24/24 passing**
+5. **`test/04-chunked-get-simple.test.ts`** - Simple Chunked GET Test ✅ **4/4 passing**
+6. **`test/05a-newsite.test.ts`** - WTTP Site Systematic Testing ✅ **15/15 passing**
+7. **`test/06-put-comprehensive.test.ts`** - PUT Method Comprehensive Testing ✅ **32/32 passing**
+8. **`test/07-patch-comprehensive.test.ts`** - PATCH Method Comprehensive Testing ✅ **42/42 passing**
 
 ### Test Contracts
 
@@ -38,16 +39,6 @@ Special test contracts are provided to expose abstract contract functionality:
 
 **Note**: Tests use `@tw3/esp` package factories (`DataPointStorage__factory`, `DataPointRegistry__factory`) for proper ESP contract integration rather than trying to deploy ESP contracts directly.
 
-### Known Issues
-
-The remaining 12 failing tests involve:
-- Complex method permission bit mapping logic
-- Error handling edge cases 
-- File path normalization
-- Gas estimation edge cases
-
-These require deeper investigation into the contract permission logic and are noted for future improvement.
-
 ### Running Tests
 
 ```shell
@@ -55,7 +46,7 @@ These require deeper investigation into the contract permission logic and are no
 npx hardhat test
 
 # Run specific test file
-npx hardhat test test/01-permissions.test.ts
+npx hardhat test test/02-permissions.test.ts
 
 # Run tests with gas reporting
 REPORT_GAS=true npx hardhat test

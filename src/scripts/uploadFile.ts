@@ -5,7 +5,7 @@ import { Web3Site } from "../typechain-types";
 
 // Constants
 const CHUNK_SIZE = 32 * 1024; // 32KB chunks
-const WTTP_VERSION = "WTTP/3.0";
+// const WTTP_VERSION = "WTTP/3.0";
 
 // Helper function to chunk file data
 function chunkData(data: Buffer, chunkSize: number): Buffer[] {

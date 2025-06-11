@@ -13,6 +13,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@wttp/core/contracts/types/WTTPTypes.sol";
 
 /// @title WTTP Permissions Contract
+/// @author Web3 Transfer Protocol (WTTP) Development Team
 /// @notice Manages role-based access control for the WTTP protocol
 /// @dev Extends OpenZeppelin's AccessControl with site-specific roles and custom permission logic
 abstract contract BaseWTTPPermissions is AccessControl { 
@@ -49,6 +50,23 @@ abstract contract BaseWTTPPermissions is AccessControl {
 
         return super.hasRole(role, account);
     }
+
+    // to include or not to include, that is the question...
+    // do we restrict this or should the implementation decide?
+    // this means we can only have 1 DEFAULT_ADMIN... you know what
+    // we should probably just remove this, it's not really needed
+    // function grantRole(bytes32 role, address account) public override virtual {
+    //     if(role == DEFAULT_ADMIN_ROLE) {
+    //         revert InvalidRole(role);
+    //     }
+    //     super.grantRole(role, account);
+    // }
+
+    // function changeDefaultAdmin(address newAdmin) public virtual onlyRole(DEFAULT_ADMIN_ROLE) {
+    //     _grantRole(DEFAULT_ADMIN_ROLE, newAdmin);
+    //     _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    //     // already emits granted and revoked events
+    // }
 
     /// @notice Modifier to prevent certain actions on admin roles
     /// @dev Used to prevent modification of privileged roles

@@ -320,9 +320,9 @@ export async function deployWeb3SiteMultiChain(
     
     const Web3SiteFactory = await hre.ethers.getContractFactory("Web3Site");
     const web3Site = await Web3SiteFactory.connect(network.deployer).deploy(
+      network.owner.address,
       network.dprAddress,
-      defaultHeader,
-      network.owner.address
+      defaultHeader
     ) as Web3Site;
     
     await web3Site.waitForDeployment();
@@ -382,9 +382,9 @@ export async function deployWeb3SiteMultiChain(
       await hre.run("verify:verify", {
         address: deployment.address,
         constructorArguments: [
+          deployment.ownerAddress,
           deployment.dprAddress,
-          defaultHeader,
-          deployment.ownerAddress
+          defaultHeader
         ],
       });
       console.log(`✅ Web3Site verified on ${deployment.networkName}`);
