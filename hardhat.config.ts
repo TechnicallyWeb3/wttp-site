@@ -1,4 +1,5 @@
 import { HardhatUserConfig } from "hardhat/config";
+import { ethers } from "ethers";
 import "@nomicfoundation/hardhat-toolbox";
 import "hardhat-change-network";
 import "hardhat-contract-sizer";

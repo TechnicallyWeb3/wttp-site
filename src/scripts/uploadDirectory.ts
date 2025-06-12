@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 import fs from "fs";
 import path from "path";
-import { Web3Site } from "../typechain-types";
+import { Web3Site } from "../../typechain-types";
 import { getMimeType, mimeTypeToBytes2 } from "./uploadFile";
 import { uploadFile } from "./uploadFile";
 

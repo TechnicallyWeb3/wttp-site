@@ -19,10 +19,10 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.20;
 
-/// !interface build ./interfaces/IWTTPStorage.sol
+/// build ./interfaces/IWTTPStorage.sol
 
-/// !interface import "./IWTTPPermissions.sol";
-/// !interface replace WTTPPermissions with IWTTPPermissions
+/// import "./IWTTPPermissions.sol";
+/// replace WTTPPermissions with IWTTPPermissions
 
 import "./01-WTTPPermissions.sol";
 

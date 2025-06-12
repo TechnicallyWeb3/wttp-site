@@ -19,12 +19,12 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.20;
 
-import "../interfaces/IWTTPSite.sol";
-import "../01-WTTPPermissions.sol";
+import "../interfaces/IBaseWTTPSite.sol";
+import "../BaseWTTPPermissions.sol";
 import "@wttp/core/contracts/types/WTTPTypes.sol";
 
 function getSiteDPR_(address _siteAddress) view returns (IDataPointRegistry) {
-    return IWTTPSite.(_siteAddress).DPR();
+    return IBaseWTTPSite(_siteAddress).DPR();
 }
 
 /// @notice Error thrown when the default origins array is invalid
@@ -32,12 +32,12 @@ function getSiteDPR_(address _siteAddress) view returns (IDataPointRegistry) {
 error InvalidOrigins(bytes32[] _origins);
 
 /// @title Extended WTTP Site Contract for Origin Testing
-/// @notice Extends WTTPStorage with cross-site origin validation capabilities
+/// @notice Extends BaseWTTPStorage with cross-site origin validation capabilities
 /// @dev Acts as a proxy to another WTTP site while enforcing strict origin validation
-abstract contract ExtendedWTTPSite is WTTPPermissions {
+abstract contract ExtendedWTTPSite is BaseWTTPPermissions {
 
     /// @notice Reference to the underlying WTTP site being proxied
-    IWTTPSite. public immutable site;
+    IBaseWTTPSite public immutable site;
 
     bytes32[] public defaultOrigins;
 
@@ -75,8 +75,8 @@ abstract contract ExtendedWTTPSite is WTTPPermissions {
         address _owner, 
         address _siteAddress, 
         bytes32[] memory _defaultOrigins
-    ) WTTPPermissions(_owner) {
-        site = IWTTPSite.(_siteAddress);
+    ) BaseWTTPPermissions(_owner) {
+        site = IBaseWTTPSite(_siteAddress);
         _setOrigins("", _defaultOrigins);
     }
 

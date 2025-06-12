@@ -18,10 +18,10 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.20;
 
-/// !interface build ./interfaces/IWTTPSite.sol
+/// build ./interfaces/IWTTPSite.sol
 
-/// !interface import "./IWTTPStorage.sol";
-/// !interface replace WTTPStorage with IWTTPStorage
+/// import "./IWTTPStorage.sol";
+/// replace WTTPStorage with IWTTPStorage
 
 import "./02-WTTPStorage.sol";
 
@@ -29,7 +29,7 @@ import "./02-WTTPStorage.sol";
 /// @author Web3 Transfer Protocol (WTTP) Development Team
 /// @notice Implements core WTTP protocol methods for HTTP-like operations on blockchain
 /// @dev Extends WTTPBaseStorage to provide web-like interactions with blockchain resources
-abstract contractWTTPSite is WTTPStorage {
+abstract contract WTTPSite is WTTPStorage {
 
     constructor(
         address _owner,

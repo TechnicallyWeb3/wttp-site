@@ -19,12 +19,12 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.20;
 
-/// !interface build ./interfaces/IWTTPPermissions.sol
+/// build ./interfaces/IWTTPPermissions.sol
 
-/// !interface import "@openzeppelin/contracts/access/IAccessControl.sol";
-/// !interface import "@wttp/core/contracts/types/WTTPTypes.sol";
-/// !interface replace AccessControl with IAccessControl
-/// !interface exclude hasRole
+/// import "@openzeppelin/contracts/access/IAccessControl.sol";
+/// import "@wttp/core/contracts/types/WTTPTypes.sol";
+/// replace AccessControl with IAccessControl
+/// exclude hasRole
 // this shouldn't be needed, overrides should automatically be excluded by hardhat-build
 
 import "@openzeppelin/contracts/access/AccessControl.sol";

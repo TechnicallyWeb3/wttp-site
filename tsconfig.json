@@ -5,7 +5,7 @@
     "lib": ["ES2020"],
     "declaration": true,
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": ".",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -14,7 +14,9 @@
     "moduleResolution": "node"
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
+    "hardhat.config.ts",
+    "typechain-types/**/*"
   ],
   "exclude": [
     "node_modules",

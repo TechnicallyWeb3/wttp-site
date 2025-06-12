@@ -1,9 +1,9 @@
 // Import ethers from the hardhat runtime environment when running
 // but allow direct import from ethers package when imported
 
-import type { Web3Site } from "../typechain-types";
 import { ethers } from "hardhat";
-import { getContractAddress } from "@tw3/esp";
+import type { Web3Site } from "../../typechain-types";
+// import { getContractAddress } from "@tw3/esp";
 
 /**
  * Fetches a resource directly from a WTTP site contract
@@ -136,7 +136,7 @@ export async function readDataPointsContent(
     try {
       // Read the datapoint content
       const dataPointContent = await dpsContract.readDataPoint(dataPointAddress);
-      const chunk = new Uint8Array(dataPointContent);
+      const chunk = new Uint8Array(ethers.toBeArray(dataPointContent));
       contents.push(chunk);
       totalBytesRead += chunk.length;
       

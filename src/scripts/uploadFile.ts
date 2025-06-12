@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 import fs from "fs";
 import path from "path";
-import { Web3Site } from "../typechain-types";
+import { Web3Site } from "../../typechain-types";
 
 // Constants
 const CHUNK_SIZE = 32 * 1024; // 32KB chunks
@@ -254,12 +254,18 @@ export async function uploadFile(
   
   // Verify upload - updated structure
   const locateRequest = {
-    path: destinationPath,
-    ifModifiedSince: 0,
-    ifNoneMatch: ethers.ZeroHash
+    head: {
+      path: destinationPath,
+      ifModifiedSince: 0,
+      ifNoneMatch: ethers.ZeroHash
+    },
+    rangeChunks: {
+      start: 0,
+      end: 0
+    }
   };
 
-  const response = await wtppSite.LOCATE(locateRequest);
+  const response = await wtppSite.GET(locateRequest);
   // console.log(response);
   
   console.log(`Uploaded file has ${response.dataPoints.length} chunks`);

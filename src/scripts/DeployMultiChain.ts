@@ -1,6 +1,6 @@
 import hre from "hardhat";
 import { formatEther, parseUnits, toUtf8Bytes } from "ethers";
-import { Web3Site } from "../typechain-types";
+import { Web3Site } from "../../typechain-types";
 import { addDeployment, formatDeploymentData } from './AddDeployment';
 import { getContractAddress } from "@tw3/esp";
 
@@ -22,6 +22,19 @@ const DEFAULT_HEADER = {
     location: ""
   }
 };
+
+// After DEFAULT_HEADER declaration, add exported interface
+export interface DeploymentResult {
+  chainId: number;
+  networkName: string;
+  contract: Web3Site;
+  address: string;
+  deployerAddress: string;
+  ownerAddress: string;
+  dprAddress: string;
+  txHash: string;
+  actualCost: bigint;
+}
 
 /**
  * Deploy Web3Site contracts across multiple chains with vanity addresses
@@ -204,9 +217,9 @@ export async function deployWeb3SiteMultiChain(
     
     const Web3SiteFactory = await hre.ethers.getContractFactory("Web3Site");
     const deployTx = await Web3SiteFactory.connect(network.deployer).getDeployTransaction(
+      network.owner.address,
       network.dprAddress,
       defaultHeader,
-      network.owner.address
     );
     
     const gasEstimate = await network.provider.estimateGas({
@@ -292,18 +305,6 @@ export async function deployWeb3SiteMultiChain(
   
   console.log("\n🚀 Deploying Web3Site contracts across all chains...");
   
-  interface DeploymentResult {
-    chainId: number;
-    networkName: string;
-    contract: Web3Site;
-    address: string;
-    deployerAddress: string;
-    ownerAddress: string;
-    dprAddress: string;
-    txHash: string;
-    actualCost: bigint;
-  }
-
   const deployments: DeploymentResult[] = [];
   
   for (const network of networks) {

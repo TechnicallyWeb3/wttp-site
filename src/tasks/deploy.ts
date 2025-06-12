@@ -1,6 +1,7 @@
 import { task, types } from "hardhat/config";
+import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-task("deploy:site", "Deploy a single Web3Site contract with funding checks")
+task("site:deploy", "Deploy a single Web3Site contract with funding checks")
   .addOptionalParam(
     "dpr",
     "DataPointRegistry contract address (defaults to @tw3/esp address for current network)",
@@ -39,7 +40,7 @@ task("deploy:site", "Deploy a single Web3Site contract with funding checks")
     "autoFund",
     "Automatically fund deployer from owner if needed"
   )
-  .setAction(async (taskArgs, hre) => {
+  .setAction(async (taskArgs, hre: HardhatRuntimeEnvironment) => {
     console.log(`🚀 Web3Site Deployment Task`);
     console.log(`🌐 Network: ${hre.network.name}\n`);
 
