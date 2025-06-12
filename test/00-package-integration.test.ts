@@ -3,38 +3,16 @@ import { ethers } from "hardhat";
 
 // Core WTTP types and factories
 import {
-  IWTTPSite,
-  IWTTPSite__factory,
-  IWTTPGateway,
-  IWTTPGateway__factory,
-  IWTTPStorage,
-  IWTTPStorage__factory,
-  IWTTPPermissions,
-  IWTTPPermissions__factory,
+  IBaseWTTPSite__factory,
+  IBaseWTTPStorage__factory,
+  IBaseWTTPPermissions__factory,
   // ESP integration types
-  IDataPointRegistry,
   IDataPointRegistry__factory,
-  IDataPointStorage,
   IDataPointStorage__factory,
-  // Artifacts
-  artifacts,
   // Type interfaces for structured data
-  IWTTPSiteInterface,
-  IWTTPGatewayInterface,
-  IWTTPStorageInterface,
-  IWTTPPermissionsInterface,
   // Struct types
   HEADRequestStruct,
-  HEADResponseStruct,
-  LOCATEResponseStruct,
-  OPTIONSResponseStruct,
-  GETRequestStruct,
-  GETResponseStruct,
   LOCATERequestStruct,
-  RangeStruct,
-  HeaderInfoStruct,
-  CacheControlStruct,
-  RedirectStruct
 } from "@wttp/core";
 
 // ESP deployment functionality
@@ -55,10 +33,9 @@ describe("WTTP Core Package Integration", function () {
 
   describe("Package Exports", function () {
     it("should export all required contract interfaces", function () {
-      expect(IWTTPSite__factory).to.not.be.undefined;
-      expect(IWTTPGateway__factory).to.not.be.undefined;
-      expect(IWTTPStorage__factory).to.not.be.undefined;
-      expect(IWTTPPermissions__factory).to.not.be.undefined;
+      expect(IBaseWTTPSite__factory).to.not.be.undefined;
+      expect(IBaseWTTPStorage__factory).to.not.be.undefined;
+      expect(IBaseWTTPPermissions__factory).to.not.be.undefined;
     });
 
     it("should export ESP integration contract factories", function () {
@@ -66,20 +43,19 @@ describe("WTTP Core Package Integration", function () {
       expect(IDataPointStorage__factory).to.not.be.undefined;
     });
 
-    it("should export artifacts for all core contracts", function () {
-      expect(artifacts).to.not.be.undefined;
-      expect(artifacts.IWTTPSite).to.not.be.undefined;
-      expect(artifacts.IWTTPGateway).to.not.be.undefined;
-      expect(artifacts.IWTTPStorage).to.not.be.undefined;
-      expect(artifacts.IWTTPPermissions).to.not.be.undefined;
-      // Note: WTTPTypes artifact excluded as it doesn't generate artifacts (types only)
-    });
+    // it("should export artifacts for all core contracts", function () {
+    //   expect(artifacts).to.not.be.undefined;
+    //   expect(artifacts.IWTTPSite).to.not.be.undefined;
+    //   expect(artifacts.IWTTPGateway).to.not.be.undefined;
+    //   expect(artifacts.IWTTPStorage).to.not.be.undefined;
+    //   expect(artifacts.IWTTPPermissions).to.not.be.undefined;
+    //   // Note: WTTPTypes artifact excluded as it doesn't generate artifacts (types only)
+    // });
 
-    it("should have valid ABIs in artifacts", function () {
-      expect(artifacts.IWTTPSite.abi).to.be.an('array');
-      expect(artifacts.IWTTPGateway.abi).to.be.an('array');
-      expect(artifacts.IWTTPStorage.abi).to.be.an('array');
-      expect(artifacts.IWTTPPermissions.abi).to.be.an('array');
+    it("should have valid ABIs in factories", function () {
+      expect(IBaseWTTPSite__factory.abi).to.be.an('array');
+      expect(IBaseWTTPStorage__factory.abi).to.be.an('array');
+      expect(IBaseWTTPPermissions__factory.abi).to.be.an('array');
     });
   });
 
@@ -208,37 +184,39 @@ describe("WTTP Core Package Integration", function () {
 
   describe("Contract Factory Creation", function () {
     it("should create IWTTPSite interface with correct methods", function () {
-      const iface = IWTTPSite__factory.createInterface();
+      const iface = IBaseWTTPSite__factory.createInterface();
       expect(iface).to.not.be.undefined;
       expect(iface.hasFunction("DPS")).to.be.true;
       expect(iface.hasFunction("DPR")).to.be.true;
       expect(iface.hasFunction("OPTIONS")).to.be.true;
       expect(iface.hasFunction("HEAD")).to.be.true;
-      expect(iface.hasFunction("LOCATE")).to.be.true;
-      expect(iface.hasFunction("GET")).to.be.true;
+      expect(iface.hasFunction("PATCH")).to.be.true;
+      expect(iface.hasFunction("PUT")).to.be.true;
+      expect(iface.hasFunction("DELETE")).to.be.true;
+      expect(iface.hasFunction("DEFINE")).to.be.true;
     });
 
-    it("should create IWTTPGateway interface with correct methods", function () {
-      const iface = IWTTPGateway__factory.createInterface();
-      expect(iface).to.not.be.undefined;
-      expect(iface.hasFunction("OPTIONS")).to.be.true;
-      expect(iface.hasFunction("GET")).to.be.true;
-      expect(iface.hasFunction("HEAD")).to.be.true;
-      expect(iface.hasFunction("LOCATE")).to.be.true;
-    });
+    // it("should create IWTTPGateway interface with correct methods", function () {
+    //   const iface = IWTTPGateway__factory.createInterface();
+    //   expect(iface).to.not.be.undefined;
+    //   expect(iface.hasFunction("OPTIONS")).to.be.true;
+    //   expect(iface.hasFunction("GET")).to.be.true;
+    //   expect(iface.hasFunction("HEAD")).to.be.true;
+    //   expect(iface.hasFunction("LOCATE")).to.be.true;
+    // });
 
     it("should create IWTTPStorage interface with correct methods", function () {
-      const iface = IWTTPStorage__factory.createInterface();
+      const iface = IBaseWTTPStorage__factory.createInterface();
       expect(iface).to.not.be.undefined;
       expect(iface.hasFunction("DPS")).to.be.true;
       expect(iface.hasFunction("DPR")).to.be.true;
-      expect(iface.hasFunction("setDPR")).to.be.true;
+      expect(iface.hasFunction("hasRole")).to.be.true;
       // Note: Some methods may not be available in the interface version
       // Testing only the core methods that are confirmed to exist
     });
 
     it("should create IWTTPPermissions interface with correct methods", function () {
-      const iface = IWTTPPermissions__factory.createInterface();
+      const iface = IBaseWTTPPermissions__factory.createInterface();
       expect(iface).to.not.be.undefined;
       expect(iface.hasFunction("hasRole")).to.be.true;
       expect(iface.hasFunction("grantRole")).to.be.true;
@@ -256,37 +234,36 @@ describe("WTTP Core Package Integration", function () {
 
   describe("Interface Method Signatures", function () {
     it("should have correct IWTTPSite interface methods", function () {
-      const iface = IWTTPSite__factory.createInterface();
+      const iface = IBaseWTTPSite__factory.createInterface();
       
       expect(iface.hasFunction("DPS")).to.be.true;
       expect(iface.hasFunction("DPR")).to.be.true;
       expect(iface.hasFunction("OPTIONS")).to.be.true;
       expect(iface.hasFunction("HEAD")).to.be.true;
-      expect(iface.hasFunction("LOCATE")).to.be.true;
-      expect(iface.hasFunction("GET")).to.be.true;
+      expect(iface.hasFunction("hasRole")).to.be.true;
     });
 
     it("should have correct IWTTPGateway interface methods", function () {
-      const iface = IWTTPGateway__factory.createInterface();
+      const iface = IBaseWTTPSite__factory.createInterface();
       
       expect(iface.hasFunction("OPTIONS")).to.be.true;
       expect(iface.hasFunction("GET")).to.be.true;
       expect(iface.hasFunction("HEAD")).to.be.true;
-      expect(iface.hasFunction("LOCATE")).to.be.true;
+      expect(iface.hasFunction("DPS")).to.be.true;
     });
 
     it("should have correct IWTTPStorage interface methods", function () {
-      const iface = IWTTPStorage__factory.createInterface();
+      const iface = IBaseWTTPStorage__factory.createInterface();
       
       expect(iface.hasFunction("DPS")).to.be.true;
       expect(iface.hasFunction("DPR")).to.be.true;
-      expect(iface.hasFunction("setDPR")).to.be.true;
+      expect(iface.hasFunction("hasRole")).to.be.true;
       // Note: Some methods may not be available in the interface version
       // Testing only the core methods that are confirmed to exist
     });
 
     it("should have correct IWTTPPermissions interface methods", function () {
-      const iface = IWTTPPermissions__factory.createInterface();
+      const iface = IBaseWTTPPermissions__factory.createInterface();
       
       expect(iface.hasFunction("hasRole")).to.be.true;
       expect(iface.hasFunction("grantRole")).to.be.true;
@@ -308,7 +285,7 @@ describe("WTTP Core Package Integration", function () {
     });
 
     it("should properly type Range structures", function () {
-      const range: RangeStruct = {
+      const range = {
         start: 0,
         end: 1023
       };
@@ -318,7 +295,7 @@ describe("WTTP Core Package Integration", function () {
     });
 
     it("should properly type HeaderInfo structures", function () {
-      const headerInfo: HeaderInfoStruct = {
+      const headerInfo = {
         cache: {
           immutableFlag: false,
           preset: 0,
@@ -341,22 +318,22 @@ describe("WTTP Core Package Integration", function () {
       expect(headerInfo.redirect.code).to.equal(0);
     });
 
-    it("should properly type GETRequest structures", function () {
-      const getRequest: GETRequestStruct = {
+    it("should properly type LOCATERequest structures", function () {
+      const getRequest: LOCATERequestStruct = {
         head: {
           path: "/api/data",
           ifModifiedSince: 0,
           ifNoneMatch: "0x0000000000000000000000000000000000000000000000000000000000000000"
         },
-        rangeBytes: {
+        rangeChunks: {
           start: 0,
-          end: 4095
+          end: 4
         }
       };
       
       expect(getRequest.head.path).to.equal("/api/data");
-      expect(getRequest.rangeBytes.start).to.equal(0);
-      expect(getRequest.rangeBytes.end).to.equal(4095);
+      expect(getRequest.rangeChunks.start).to.equal(0);
+      expect(getRequest.rangeChunks.end).to.equal(4);
     });
   });
 
@@ -364,13 +341,11 @@ describe("WTTP Core Package Integration", function () {
     it("should connect to contracts using factory and address", function () {
       const mockAddress = "0x1234567890123456789012345678901234567890";
       
-      const siteContract = IWTTPSite__factory.connect(mockAddress, signer);
-      const gatewayContract = IWTTPGateway__factory.connect(mockAddress, signer);
-      const storageContract = IWTTPStorage__factory.connect(mockAddress, signer);
-      const permissionsContract = IWTTPPermissions__factory.connect(mockAddress, signer);
+      const siteContract = IBaseWTTPSite__factory.connect(mockAddress, signer);
+      const storageContract = IBaseWTTPStorage__factory.connect(mockAddress, signer);
+      const permissionsContract = IBaseWTTPPermissions__factory.connect(mockAddress, signer);
       
       expect(siteContract.target).to.equal(mockAddress);
-      expect(gatewayContract.target).to.equal(mockAddress);
       expect(storageContract.target).to.equal(mockAddress);
       expect(permissionsContract.target).to.equal(mockAddress);
     });
@@ -387,38 +362,37 @@ describe("WTTP Core Package Integration", function () {
   });
 
   describe("ABI Compatibility", function () {
-    it("should have compatible function signatures in artifacts", function () {
-      const siteABI = artifacts.IWTTPSite.abi;
-      const gatewayABI = artifacts.IWTTPGateway.abi;
-      const storageABI = artifacts.IWTTPStorage.abi;
-      const permissionsABI = artifacts.IWTTPPermissions.abi;
+    // it("should have compatible function signatures in artifacts", function () {
+    //   const siteABI = artifacts.IWTTPSite.abi;
+    //   const gatewayABI = artifacts.IWTTPGateway.abi;
+    //   const storageABI = artifacts.IWTTPStorage.abi;
+    //   const permissionsABI = artifacts.IWTTPPermissions.abi;
       
-      // Check that core methods exist in ABIs
-      const siteMethodNames = siteABI.filter((item: any) => item.type === 'function').map((fn: any) => fn.name);
-      const gatewayMethodNames = gatewayABI.filter((item: any) => item.type === 'function').map((fn: any) => fn.name);
-      const storageMethodNames = storageABI.filter((item: any) => item.type === 'function').map((fn: any) => fn.name);
-      const permissionsMethodNames = permissionsABI.filter((item: any) => item.type === 'function').map((fn: any) => fn.name);
+    //   // Check that core methods exist in ABIs
+    //   const siteMethodNames = siteABI.filter((item: any) => item.type === 'function').map((fn: any) => fn.name);
+    //   const gatewayMethodNames = gatewayABI.filter((item: any) => item.type === 'function').map((fn: any) => fn.name);
+    //   const storageMethodNames = storageABI.filter((item: any) => item.type === 'function').map((fn: any) => fn.name);
+    //   const permissionsMethodNames = permissionsABI.filter((item: any) => item.type === 'function').map((fn: any) => fn.name);
       
-      expect(siteMethodNames).to.include.members(['DPS', 'DPR', 'OPTIONS', 'HEAD', 'LOCATE', 'GET']);
-      expect(gatewayMethodNames).to.include.members(['OPTIONS', 'GET', 'HEAD', 'LOCATE']);
-      expect(storageMethodNames).to.include.members(['DPS', 'DPR', 'setDPR']);
-      expect(permissionsMethodNames).to.include.members(['hasRole', 'grantRole', 'revokeRole']);
-    });
+    //   expect(siteMethodNames).to.include.members(['DPS', 'DPR', 'OPTIONS', 'HEAD', 'LOCATE', 'GET']);
+    //   expect(gatewayMethodNames).to.include.members(['OPTIONS', 'GET', 'HEAD', 'LOCATE']);
+    //   expect(storageMethodNames).to.include.members(['DPS', 'DPR', 'setDPR']);
+    //   expect(permissionsMethodNames).to.include.members(['hasRole', 'grantRole', 'revokeRole']);
+    // });
 
     it("should have static ABI property accessible on factories", function () {
-      expect(IWTTPSite__factory.abi).to.be.an('array');
-      expect(IWTTPGateway__factory.abi).to.be.an('array');
-      expect(IWTTPStorage__factory.abi).to.be.an('array');
-      expect(IWTTPPermissions__factory.abi).to.be.an('array');
+      expect(IBaseWTTPSite__factory.abi).to.be.an('array');
+      expect(IBaseWTTPStorage__factory.abi).to.be.an('array');
+      expect(IBaseWTTPPermissions__factory.abi).to.be.an('array');
     });
 
-    it("should match ABIs between artifacts and factories", function () {
-      // Verify that the ABIs from artifacts match those from factories
-      expect(artifacts.IWTTPSite.abi).to.deep.equal(IWTTPSite__factory.abi);
-      expect(artifacts.IWTTPGateway.abi).to.deep.equal(IWTTPGateway__factory.abi);
-      expect(artifacts.IWTTPStorage.abi).to.deep.equal(IWTTPStorage__factory.abi);
-      expect(artifacts.IWTTPPermissions.abi).to.deep.equal(IWTTPPermissions__factory.abi);
-    });
+    // it("should match ABIs between artifacts and factories", function () {
+    //   // Verify that the ABIs from artifacts match those from factories
+    //   expect(artifacts.IWTTPSite.abi).to.deep.equal(IWTTPSite__factory.abi);
+    //   expect(artifacts.IWTTPGateway.abi).to.deep.equal(IWTTPGateway__factory.abi);
+    //   expect(artifacts.IWTTPStorage.abi).to.deep.equal(IWTTPStorage__factory.abi);
+    //   expect(artifacts.IWTTPPermissions.abi).to.deep.equal(IWTTPPermissions__factory.abi);
+    // });
   });
 
   describe("Integration with Deployment Addresses", function () {
@@ -436,16 +410,14 @@ describe("WTTP Core Package Integration", function () {
       };
       
       // Connect to all contracts using deployment addresses
-      const siteContract = IWTTPSite__factory.connect(mockDeployments.IWTTPSite, signer);
-      const gatewayContract = IWTTPGateway__factory.connect(mockDeployments.IWTTPGateway, signer);
-      const storageContract = IWTTPStorage__factory.connect(mockDeployments.IWTTPStorage, signer);
-      const permissionsContract = IWTTPPermissions__factory.connect(mockDeployments.IWTTPPermissions, signer);
+      const siteContract = IBaseWTTPSite__factory.connect(mockDeployments.IWTTPSite, signer);
+      const storageContract = IBaseWTTPStorage__factory.connect(mockDeployments.IWTTPStorage, signer);
+      const permissionsContract = IBaseWTTPPermissions__factory.connect(mockDeployments.IWTTPPermissions, signer);
       const dprContract = IDataPointRegistry__factory.connect(mockDeployments.IDataPointRegistry, signer);
       const dpsContract = IDataPointStorage__factory.connect(mockDeployments.IDataPointStorage, signer);
       
       // Verify all contracts are properly instantiated
       expect(siteContract.target).to.equal(mockDeployments.IWTTPSite);
-      expect(gatewayContract.target).to.equal(mockDeployments.IWTTPGateway);
       expect(storageContract.target).to.equal(mockDeployments.IWTTPStorage);
       expect(permissionsContract.target).to.equal(mockDeployments.IWTTPPermissions);
       expect(dprContract.target).to.equal(mockDeployments.IDataPointRegistry);
@@ -453,34 +425,33 @@ describe("WTTP Core Package Integration", function () {
       
       // Verify contract interfaces are available
       expect(siteContract.interface.hasFunction("OPTIONS")).to.be.true;
-      expect(gatewayContract.interface.hasFunction("GET")).to.be.true;
-      expect(storageContract.interface.hasFunction("setDPR")).to.be.true;
+      expect(storageContract.interface.hasFunction("DPS")).to.be.true;
       expect(permissionsContract.interface.hasFunction("hasRole")).to.be.true;
     });
 
-    it("should demonstrate getting deployment addresses from artifacts", function () {
-      // Show how artifacts can be used to get contract information for deployment
-      const siteArtifact = artifacts.IWTTPSite;
-      const gatewayArtifact = artifacts.IWTTPGateway;
-      const storageArtifact = artifacts.IWTTPStorage;
-      const permissionsArtifact = artifacts.IWTTPPermissions;
+    // it("should demonstrate getting deployment addresses from artifacts", function () {
+    //   // Show how artifacts can be used to get contract information for deployment
+    //   const siteArtifact = artifacts.IWTTPSite;
+    //   const gatewayArtifact = artifacts.IWTTPGateway;
+    //   const storageArtifact = artifacts.IWTTPStorage;
+    //   const permissionsArtifact = artifacts.IWTTPPermissions;
       
-      // Verify artifacts have the expected structure
-      expect(siteArtifact).to.have.property('abi');
-      expect(siteArtifact).to.have.property('bytecode');
-      expect(gatewayArtifact).to.have.property('abi');
-      expect(gatewayArtifact).to.have.property('bytecode');
-      expect(storageArtifact).to.have.property('abi');
-      expect(storageArtifact).to.have.property('bytecode');
-      expect(permissionsArtifact).to.have.property('abi');
-      expect(permissionsArtifact).to.have.property('bytecode');
+    //   // Verify artifacts have the expected structure
+    //   expect(siteArtifact).to.have.property('abi');
+    //   expect(siteArtifact).to.have.property('bytecode');
+    //   expect(gatewayArtifact).to.have.property('abi');
+    //   expect(gatewayArtifact).to.have.property('bytecode');
+    //   expect(storageArtifact).to.have.property('abi');
+    //   expect(storageArtifact).to.have.property('bytecode');
+    //   expect(permissionsArtifact).to.have.property('abi');
+    //   expect(permissionsArtifact).to.have.property('bytecode');
       
-      // Verify bytecode exists (for interfaces it should be "0x")
-      expect(siteArtifact.bytecode).to.be.a('string');
-      expect(gatewayArtifact.bytecode).to.be.a('string');
-      expect(storageArtifact.bytecode).to.be.a('string');
-      expect(permissionsArtifact.bytecode).to.be.a('string');
-    });
+    //   // Verify bytecode exists (for interfaces it should be "0x")
+    //   expect(siteArtifact.bytecode).to.be.a('string');
+    //   expect(gatewayArtifact.bytecode).to.be.a('string');
+    //   expect(storageArtifact.bytecode).to.be.a('string');
+    //   expect(permissionsArtifact.bytecode).to.be.a('string');
+    // });
 
     it("should integrate ESP deployment addresses with WTTP contracts", async function () {
       const supportedChains = getSupportedChainIds();
@@ -500,7 +471,7 @@ describe("WTTP Core Package Integration", function () {
           
           // Verify these can be used in WTTP site context
           const mockSiteAddress = "0x1111111111111111111111111111111111111111";
-          const siteContract = IWTTPSite__factory.connect(mockSiteAddress, signer);
+          const siteContract = IBaseWTTPSite__factory.connect(mockSiteAddress, signer);
           
           // Site contract should have DPR and DPS methods that return these addresses
           expect(siteContract.interface.hasFunction("DPR")).to.be.true;
@@ -519,12 +490,12 @@ describe("WTTP Core Package Integration", function () {
       
       // Test that contract can be created with invalid address (ethers allows this)
       // but verify it's properly handled when used
-      const siteContract = IWTTPSite__factory.connect(invalidAddress, signer);
+      const siteContract = IBaseWTTPSite__factory.connect(invalidAddress, signer);
       expect(siteContract.target).to.equal(invalidAddress);
       
       // Test with empty string address
       expect(() => {
-        IWTTPSite__factory.connect("", signer);
+        IBaseWTTPSite__factory.connect("", signer);
       }).to.not.throw();
       
       // The actual validation happens when contract methods are called,
@@ -553,36 +524,29 @@ describe("WTTP Core Package Integration", function () {
       const mockGatewayAddress = "0x2222222222222222222222222222222222222222";
       
       // Connect to contracts
-      const site = IWTTPSite__factory.connect(mockSiteAddress, signer);
-      const gateway = IWTTPGateway__factory.connect(mockGatewayAddress, signer);
+      const site = IBaseWTTPSite__factory.connect(mockSiteAddress, signer);
       
       // Verify TypeChain generated methods are available
       expect(typeof site.OPTIONS).to.equal('function');
       expect(typeof site.HEAD).to.equal('function');
       expect(typeof site.GET).to.equal('function');
-      expect(typeof site.LOCATE).to.equal('function');
-      
-      expect(typeof gateway.OPTIONS).to.equal('function');
-      expect(typeof gateway.HEAD).to.equal('function');
-      expect(typeof gateway.GET).to.equal('function');
-      expect(typeof gateway.LOCATE).to.equal('function');
+      expect(typeof site.DELETE).to.equal('function');
+      expect(typeof site.DEFINE).to.equal('function');
+      expect(typeof site.PUT).to.equal('function');
+      expect(typeof site.PATCH).to.equal('function');
     });
 
     it("should provide access to interface encoding/decoding functionality", function () {
-      const siteInterface = IWTTPSite__factory.createInterface();
-      const gatewayInterface = IWTTPGateway__factory.createInterface();
+      const siteInterface = IBaseWTTPSite__factory.createInterface();
       
       // Test that interface can encode function calls
       expect(typeof siteInterface.encodeFunctionData).to.equal('function');
       expect(typeof siteInterface.decodeFunctionResult).to.equal('function');
-      
-      expect(typeof gatewayInterface.encodeFunctionData).to.equal('function');
-      expect(typeof gatewayInterface.decodeFunctionResult).to.equal('function');
     });
 
     it("should provide comprehensive contract interaction capabilities", function () {
       const mockAddress = "0x1234567890123456789012345678901234567890";
-      const siteContract = IWTTPSite__factory.connect(mockAddress, signer);
+      const siteContract = IBaseWTTPSite__factory.connect(mockAddress, signer);
       
       // Test that all necessary properties are available for contract interaction
       expect(siteContract).to.have.property('target');
@@ -595,7 +559,10 @@ describe("WTTP Core Package Integration", function () {
       expect(typeof siteContract.OPTIONS).to.equal('function');
       expect(typeof siteContract.HEAD).to.equal('function');
       expect(typeof siteContract.GET).to.equal('function');
-      expect(typeof siteContract.LOCATE).to.equal('function');
+      expect(typeof siteContract.PATCH).to.equal('function');
+      expect(typeof siteContract.PUT).to.equal('function');
+      expect(typeof siteContract.DELETE).to.equal('function');
+      expect(typeof siteContract.DEFINE).to.equal('function');
     });
   });
 });

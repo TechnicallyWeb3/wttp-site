@@ -1,5 +1,5 @@
 /*
- * Web3 Transfer Protocol (WTTP) - BaseWTTPPermissions Contract
+ * Web3 Transfer Protocol (WTTP) - WTTPStorage Contract
  * Copyright (C) 2025 TechnicallyWeb3
  * 
  * This program is free software: you can redistribute it and/or modify
@@ -19,6 +19,14 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.20;
 
+/// build ./interfaces/IWTTPPermissions.sol
+
+/// import "@openzeppelin/contracts/access/IAccessControl.sol";
+/// import "@wttp/core/contracts/types/WTTPTypes.sol";
+/// replace AccessControl with IAccessControl
+/// exclude hasRole
+// this shouldn't be needed, overrides should automatically be excluded by hardhat-build
+
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@wttp/core/contracts/types/WTTPTypes.sol";
 
@@ -26,7 +34,7 @@ import "@wttp/core/contracts/types/WTTPTypes.sol";
 /// @author Web3 Transfer Protocol (WTTP) Development Team
 /// @notice Manages role-based access control for the WTTP protocol
 /// @dev Extends OpenZeppelin's AccessControl with site-specific roles and custom permission logic
-abstract contract BaseWTTPPermissions is AccessControl { 
+abstract contract WTTPPermissions is AccessControl { 
 
     /// @notice Role identifier for site administrators
     /// @dev Calculated via keccak256 during construction. Site admins have elevated privileges but below the DEFAULT_ADMIN_ROLE

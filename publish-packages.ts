@@ -92,7 +92,7 @@ function main(): void {
   
   try {
     // Publish public package (uses current package.json)
-    publishPackage('ethereum-storage', 'package.json', options);
+    publishPackage('wttp-site', 'package.json', options);
     
     // Publish organization scoped package (temporarily swaps package.json)
     publishPackage('@wttp/site', 'package.wttp.json', options);
@@ -101,8 +101,8 @@ function main(): void {
     
     if (!dryRun) {
       console.log('\n📋 Installation commands:');
-      console.log('npm install ethereum-storage');
-      console.log('npm install @tw3/esp');
+      console.log('npm install wttp-site');
+      console.log('npm install @wttp/site');
     }
     
   } catch (error) {

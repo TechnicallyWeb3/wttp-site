@@ -2,7 +2,6 @@ import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "hardhat-change-network";
 import "hardhat-contract-sizer";
-import "hardhat-build";
 import "hardhat-docgen";
 
 // Import task definitions

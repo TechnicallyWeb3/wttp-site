@@ -1,5 +1,5 @@
 /*
- * Web3 Transfer Protocol (WTTP) - BaseWTTPSite Contract
+ * Web3 Transfer Protocol (WTTP) -WTTPSite Contract
  * Copyright (C) 2025 TechnicallyWeb3
  * 
  * This program is free software: you can redistribute it and/or modify
@@ -15,23 +15,27 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.20;
 
-import "./BaseWTTPStorage.sol";
+/// build ./interfaces/IWTTPSite.sol
+
+/// import "./IWTTPStorage.sol";
+/// replace WTTPStorage with IWTTPStorage
+
+import "./02-WTTPStorage.sol";
 
 /// @title WTTP Base Site Contract
 /// @author Web3 Transfer Protocol (WTTP) Development Team
 /// @notice Implements core WTTP protocol methods for HTTP-like operations on blockchain
 /// @dev Extends WTTPBaseStorage to provide web-like interactions with blockchain resources
-abstract contract BaseWTTPSite is BaseWTTPStorage {
+abstract contract WTTPSite is WTTPStorage {
 
     constructor(
         address _owner,
         address _dpr,
         HeaderInfo memory _defaultHeader
-    ) BaseWTTPStorage(_owner, _dpr) {
+    ) WTTPStorage(_owner, _dpr) {
         _setDefaultHeader(_defaultHeader);
     }
 
