@@ -1,0 +1,40 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "es2020",
+    "lib": ["es2020"],
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "node"
+  },
+  "include": [
+    "typechain-types/common.ts",
+    "typechain-types/hardhat.d.ts",
+    "typechain-types/index.ts",
+    "typechain-types/contracts/BaseWTTPStorage.ts",
+    "typechain-types/contracts/BaseWTTPPermissions.ts",
+    "typechain-types/contracts/BaseWTTPSite.ts",
+    "typechain-types/contracts/interfaces",
+    "typechain-types/factories/contracts/BaseWTTPStorage__factory.ts",
+    "typechain-types/factories/contracts/BaseWTTPPermissions__factory.ts",
+    "typechain-types/factories/contracts/BaseWTTPSite__factory.ts",
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "test",
+    "scripts",
+    "artifacts",
+    "cache",
+    "typechain-types/@openzeppelin",
+    "typechain-types/**/test/**",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
+} 

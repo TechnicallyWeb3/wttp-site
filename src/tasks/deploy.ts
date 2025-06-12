@@ -268,7 +268,7 @@ task("site:deploy", "Deploy a single Web3Site contract with funding checks")
     }
   });
 
-task("deploy:multichain", "Deploy Web3Site contracts across multiple chains")
+task("site:multichain", "Deploy Web3Site contracts across multiple chains")
   .addParam(
     "chains",
     "Comma-separated list of chain IDs (e.g., '11155111,80002')",
@@ -346,7 +346,7 @@ task("deploy:multichain", "Deploy Web3Site contracts across multiple chains")
     }
   });
 
-task("deploy:verify", "Verify deployed Web3Site contract")
+task("site:verify", "Verify deployed Web3Site contract")
   .addParam("address", "Web3Site contract address", undefined, types.string)
   .addParam("dpr", "DPR address used in constructor", undefined, types.string)
   .addParam("owner", "Owner address used in constructor", undefined, types.string)

@@ -51,7 +51,7 @@ Deploying your on-chain website is now a single command. You don't need to provi
 
 ```bash
 # Deploy to Sepolia testnet (or any network configured in your hardhat.config.ts)
-npx hardhat deploy:site --network sepolia
+npx hardhat site:deploy --network sepolia
 ```
 
 **What this command does for you:**
@@ -89,7 +89,7 @@ For most common use cases, you don't need to write custom deployment scripts. Yo
 Deploy a site optimized to serve an immutable NFT collection with aggressive caching and open CORS policies.
 
 ```bash
-npx hardhat deploy:site \
+npx hardhat site:deploy \
   --header-preset immutable \
   --cache-preset aggressive \
   --cors-preset allow-all \
@@ -99,7 +99,7 @@ npx hardhat deploy:site \
 You can also override any specific default. For example, to set a custom cache age:
 ```bash
 # Set cache to 2 hours (7200 seconds)
-npx hardhat deploy:site --max-age 7200 --network sepolia
+npx hardhat site:deploy --max-age 7200 --network sepolia
 ```
 
 ---

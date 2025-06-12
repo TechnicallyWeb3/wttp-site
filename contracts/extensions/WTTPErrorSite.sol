@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "../interfaces/IBaseWTTPSite.sol";
 
-contract WTTPErrorSite {
+abstract contract WTTPErrorSite {
 
     IBaseWTTPSite public immutable site;
 

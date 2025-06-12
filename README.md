@@ -42,7 +42,7 @@ Thanks to intelligent defaults, you can deploy a fully-configured site with a si
 
 ```bash
 # Deploy to Sepolia testnet (or any configured network)
-npx hardhat deploy:site --network sepolia
+npx hardhat site:deploy --network sepolia
 ```
 That's it! Your on-chain web server is now live.
 
@@ -75,7 +75,7 @@ Customize your site's behavior instantly using powerful preset flags. No need to
 
 **Example:** Deploy a site optimized for an immutable static asset collection.
 ```bash
-npx hardhat deploy:site --header-preset immutable --cache-preset aggressive --network sepolia
+npx hardhat site:deploy --header-preset immutable --cache-preset aggressive --network sepolia
 ```
 
 ---
