@@ -1,6 +1,6 @@
 {
   "name": "@wttp/site",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Web3 Transfer Protocol (WTTP) - Site Contracts and deployment tools",
   "main": "./dist/cjs/src/index.js",
   "module": "./dist/esm/src/index.js",
@@ -39,7 +39,7 @@
     "test:setup": "npx shx cp -r test-contracts/* contracts/",
     "test:cleanup": "npx shx rm -rf contracts/test-*",
     "interface:clean": "npx shx rm -rf contracts/interfaces",
-    "compile": "npx hardhat build --force",
+    "compile": "npx hardhat compile",
     "build": "npm run compile && npm run clean && npm run build:types && npm run build:cjs && npm run build:esm",
     "build:types": "tsc --project tsconfig.build.json --declaration --emitDeclarationOnly --outDir dist/types",
     "build:cjs": "tsc --project tsconfig.build.json --module commonjs --outDir dist/cjs",
@@ -73,17 +73,16 @@
     "url": "https://github.com/TechnicallyWeb3/wttp-site/issues"
   },
   "homepage": "https://github.com/TechnicallyWeb3/wttp-site#readme",
-  "peerDependencies": {
-    "@wttp/core": "^0.2.5"
-  },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "hardhat": "^2.24.2",
-    "hardhat-build": "^0.1.2",
     "hardhat-change-network": "^0.0.7",
     "hardhat-contract-sizer": "^2.10.0",
     "hardhat-docgen": "^1.3.0",
     "rimraf": "^6.0.1",
     "shx": "^0.3.4"
+  },
+  "peerDependencies": {
+    "@wttp/core": "^0.2.8"
   }
 }
