@@ -88,6 +88,7 @@ abstract contract BaseWTTPStorage is BaseWTTPPermissions {
     ) internal virtual returns (bytes32 headerAddress) {
         headerAddress = getHeaderAddress(_header);
         _updateHeader(headerAddress, _header);
+        emit HeaderCreated(headerAddress);
     }
 
     /// @notice Retrieves header information by its address
@@ -138,6 +139,7 @@ abstract contract BaseWTTPStorage is BaseWTTPPermissions {
             revert InvalidHeader(_header);
         }
         header[_headerAddress] = _header;
+        emit HeaderUpdated(_headerAddress);
     }
 
     // was debating on using a _readHeaderByAddress function, but decided against it
@@ -226,6 +228,7 @@ abstract contract BaseWTTPStorage is BaseWTTPPermissions {
         // or a 410 Gone error in the client if the resource has been made immutable
 
         metadata[_path] = _metadata;
+        emit MetadataUpdated(_path);
     }
     
     /// @notice Deletes metadata for a resource
@@ -243,6 +246,7 @@ abstract contract BaseWTTPStorage is BaseWTTPPermissions {
         // For now, let's keep it internal so our test contracts can call it.
         _updateMetadata(_path, zeroMetadata);
         metadata[_path].lastModified = 0;
+        emit MetadataDeleted(_path);
     }
 
     // ===== Resource operations =====
@@ -267,6 +271,8 @@ abstract contract BaseWTTPStorage is BaseWTTPPermissions {
             _dataRegistration.data,
             _dataRegistration.publisher
         );
+
+        emit ResourceCreated(_path);
 
         _updateResource(_path, _dataPointAddress, _dataRegistration.chunkIndex);
     }
@@ -316,6 +322,7 @@ abstract contract BaseWTTPStorage is BaseWTTPPermissions {
         }
 
         _updateMetadataStats(_path);
+        emit ResourceUpdated(_path, _chunkIndex);
     }
 
     /// @notice Removes a resource and its metadata
@@ -327,6 +334,7 @@ abstract contract BaseWTTPStorage is BaseWTTPPermissions {
         delete resource[_path];
         metadata[_path].size = 0;
         _deleteMetadata(_path);
+        emit ResourceDeleted(_path);
     }
 
     /// @notice Bulk upload of data points for a resource

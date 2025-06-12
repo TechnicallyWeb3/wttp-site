@@ -23,7 +23,7 @@ import {
 import { TestWTTPPermissions } from "../typechain-types/contracts/test/TestWTTPPermissions";
 import { TestWTTPStorage } from "../typechain-types/contracts/test/TestWTTPStorage";
 import { TestWTTPSite } from "../typechain-types/contracts/test/TestWTTPSite";
-import { IBaseWTTPSite } from "../typechain-types/contracts/interfaces/IBaseWTTPSite";
+import { IBaseWTTPSite } from "@wttp/core";
 
 import { loadEspContracts } from "./helpers/espHelpers";
 import { BaseContract } from "ethers";

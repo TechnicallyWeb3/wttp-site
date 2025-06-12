@@ -1,4 +1,4 @@
-import { HeaderInfoStruct, IDataPointStorage, IWTTPSite, PUBLIC_HEADER } from "@wttp/core";
+import { HeaderInfoStruct, IDataPointStorage, IBaseWTTPSite, PUBLIC_HEADER } from "@wttp/core";
 import { getSupportedChainIds, IDataPointRegistry, loadContract } from "@tw3/esp";
 import { expect } from "chai";
 import { ethers } from "hardhat";
@@ -74,7 +74,7 @@ describe("Simple Chunked GET Test", function () {
     });
     let dps: IDataPointStorage;
     let dpr: IDataPointRegistry;
-    let site: IWTTPSite | TestWTTPSite;
+    let site: IBaseWTTPSite | TestWTTPSite;
     describe("Contract Implementation", function () {
         before(async function () {
             const [deployer] = await ethers.getSigners();

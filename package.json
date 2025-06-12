@@ -37,7 +37,7 @@
   "scripts": {
     "test": "npm run test:setup && npx hardhat test && npm run test:cleanup",
     "test:setup": "npx shx cp -r test-contracts/* contracts/",
-    "test:cleanup": "npx shx rm -rf contracts/test-*",
+    "test:cleanup": "npx shx rm -rf contracts/test",
     "interface:clean": "npx shx rm -rf contracts/interfaces",
     "compile": "npx hardhat compile",
     "build": "npm run compile && npm run clean && npm run build:types && npm run build:cjs && npm run build:esm",
