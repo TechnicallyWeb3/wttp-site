@@ -1,0 +1,106 @@
+# Source files (compiled versions will be in dist/)
+src/
+tsconfig.json
+tsconfig.build.json
+
+# Development dependencies
+node_modules/
+.env
+.env.*
+
+# Hardhat development files
+hardhat.config.ts
+/cache
+/artifacts
+ignition/
+
+# Tests and test-related files
+test/
+**/test/
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+
+# TypeChain files (we export curated versions from src/types)
+/typechain-types
+
+# Build tools and scripts
+scripts/copy-contracts.ts
+scripts/publish-packages.ts
+
+# Original contracts (cleaned versions are in dist/contracts)
+contracts/
+
+# Version control
+.git/
+.gitignore
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Coverage reports
+coverage/
+*.lcov
+
+# Package lock files (end users should generate their own)
+package-lock.json
+yarn.lock
+
+# Alternative package.json files
+package.tw3.json
+package.json.backup
+
+# Build artifacts
+node_modules/
+coverage/
+.nyc_output/
+
+# Development files
+.env
+.env.*
+!.env.template
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+test/
+tests/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+
+# Hardhat specific
+cache/
+# artifacts/
+
+# AI Agent files
+/agent-files

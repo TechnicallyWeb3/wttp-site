@@ -1,3 +1,7 @@
+<!--
+© 2025 TechnicallyWeb3 – Licensed under AGPL-3.0
+-->
+
 # Blockchain Basics for Web Developers
 
 > **🎯 Target Audience**: Web developers familiar with traditional APIs who are new to blockchain development

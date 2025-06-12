@@ -1,12 +1,30 @@
+/*
+ * Web3 Transfer Protocol (WTTP) - WTTPStorage Contract
+ * Copyright (C) 2025 TechnicallyWeb3
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.20;
 
-import "../interfaces/IBaseWTTPSite.sol";
-import "../BaseWTTPPermissions.sol";
+import "../interfaces/IWTTPSite.sol";
+import "../01-WTTPPermissions.sol";
 import "@wttp/core/contracts/types/WTTPTypes.sol";
 
 function getSiteDPR_(address _siteAddress) view returns (IDataPointRegistry) {
-    return IBaseWTTPSite(_siteAddress).DPR();
+    return IWTTPSite.(_siteAddress).DPR();
 }
 
 /// @notice Error thrown when the default origins array is invalid
@@ -14,12 +32,12 @@ function getSiteDPR_(address _siteAddress) view returns (IDataPointRegistry) {
 error InvalidOrigins(bytes32[] _origins);
 
 /// @title Extended WTTP Site Contract for Origin Testing
-/// @notice Extends BaseWTTPStorage with cross-site origin validation capabilities
+/// @notice Extends WTTPStorage with cross-site origin validation capabilities
 /// @dev Acts as a proxy to another WTTP site while enforcing strict origin validation
-abstract contract ExtendedWTTPSite is BaseWTTPPermissions {
+abstract contract ExtendedWTTPSite is WTTPPermissions {
 
     /// @notice Reference to the underlying WTTP site being proxied
-    IBaseWTTPSite public immutable site;
+    IWTTPSite. public immutable site;
 
     bytes32[] public defaultOrigins;
 
@@ -57,8 +75,8 @@ abstract contract ExtendedWTTPSite is BaseWTTPPermissions {
         address _owner, 
         address _siteAddress, 
         bytes32[] memory _defaultOrigins
-    ) BaseWTTPPermissions(_owner) {
-        site = IBaseWTTPSite(_siteAddress);
+    ) WTTPPermissions(_owner) {
+        site = IWTTPSite.(_siteAddress);
         _setOrigins("", _defaultOrigins);
     }
 

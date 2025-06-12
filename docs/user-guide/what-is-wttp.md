@@ -1,3 +1,7 @@
+<!--
+© 2025 TechnicallyWeb3 – Licensed under AGPL-3.0
+-->
+
 # WTTP: Your Website on the Blockchain
 
 *Finally, a way to host websites that can't be censored, taken down, or controlled by anyone but you.*

@@ -1,173 +1,158 @@
-# Getting Started with WTTP
+<!--
+© 2025 TechnicallyWeb3 – Licensed under AGPL-3.0
+-->
 
-## Your First WTTP Site in 5 Steps
+# Getting Started with WTTP Site
 
-Ready to put your website on the blockchain? Let's walk through creating your first WTTP site step by step.
-
-### Prerequisites
-
-**What you need:**
-- Node.js (v16 or higher)
-- A wallet with some ETH for gas fees
-- Basic familiarity with command line
-- Your website files ready to upload
-
-**No Solidity knowledge required!** WTTP handles the smart contract complexity for you.
+Welcome to the future of web hosting. This guide will walk you through deploying a fully on-chain, decentralized website using WTTP Site. Thanks to a streamlined command-line interface (CLI) and intelligent defaults, you can get started without writing a single line of Solidity.
 
 ---
 
-## Step 1: Set Up Your Environment
+## 1. Installation
+
+You have two ways to use WTTP Site.
+
+### For Consumers (Recommended)
+
+If you just want to deploy sites and upload files, install the package globally or locally in your project.
 
 ```bash
-# Clone the WTTP repository
-git clone https://github.com/your-org/wttp-site
+# Install globally to use the commands anywhere
+npm install -g wttp-site
+
+# Or install in your existing project
+npm install wttp-site
+```
+
+This gives you access to the `hardhat` command, which is the main entry point for all WTTP tasks.
+
+### For Developers
+
+If you want to extend the contracts or contribute to the project, clone the repository directly.
+
+```bash
+git clone https://github.com/TechnicallyWeb3/wttp-site.git
 cd wttp-site
-
-# Install dependencies
 npm install
-
-# Copy environment template
-cp .env.example .env
 ```
 
-**Edit your `.env` file:**
-```env
-PRIVATE_KEY=your_wallet_private_key_here
-NETWORK=sepolia  # or mainnet for production
-```
+#### Peer Dependencies
 
-> 🔒 **Security Note**: Never commit your private key to version control!
-
----
-
-## Step 2: Deploy Your Site Contract
-
+WTTP Site relies on `hardhat` and `ethers`. If you are installing it in a fresh project, you may need to install these as well:
 ```bash
-# Deploy a new WTTP site
-npx hardhat run scripts/deploy-site.js --network sepolia
-```
-
-**What happens:**
-- Creates your personal WTTP site contract
-- You become the SITE_ADMIN automatically
-- Returns your site address (save this!)
-
-**Expected output:**
-```
-✅ WTTP Site deployed at: 0x742d35Cc6523C0532...
-✅ You are the site admin
-✅ Gas used: ~2.1M gas
+npm install hardhat ethers
 ```
 
 ---
 
-## Step 3: Upload Your First File
+## 2. The "Just Works" Deployment
 
-Let's upload a simple HTML page:
+Deploying your on-chain website is now a single command. You don't need to provide any parameters to get a secure, functional site up and running.
 
-**Create `hello.html`:**
-```html
-<!DOCTYPE html>
-<html>
-<head>
-    <title>My First WTTP Site</title>
-</head>
-<body>
-    <h1>Hello, Decentralized Web!</h1>
-    <p>This page is hosted on the blockchain using WTTP.</p>
-</body>
-</html>
-```
-
-**Upload it:**
 ```bash
-# Upload using the PUT method (just like HTTP!)
-npx hardhat run scripts/put-file.js --network sepolia
+# Deploy to Sepolia testnet (or any network configured in your hardhat.config.ts)
+npx hardhat deploy:site --network sepolia
 ```
 
-**The script will prompt you:**
-```
-Site address: 0x742d35Cc6523C0532...
-File path: hello.html
-Resource name: /index.html
-```
+**What this command does for you:**
+- **Finds Official Contracts**: It automatically locates the correct addresses for the ESP core contracts (`DataPointRegistry`) on the specified network.
+- **Sets Secure Defaults**: Your user wallet is assigned as the `SITE_ADMIN`, giving you full control. Public access is disabled by default.
+- **Deploys Your Site**: A new `Web3Site.sol` contract is deployed to the blockchain.
+- **Returns the Address**: The CLI prints the address of your new on-chain site. **Save this address!**
 
-**What happens behind the scenes:**
-- File gets chunked into 32KB pieces (WTTP handles this)
-- Each chunk stored securely on blockchain
-- Metadata tracks all chunks for reassembly
-- File becomes accessible via HTTP-like GET requests
-
+**Expected Output:**
+```
+✅ Compiling contracts...
+✅ Site contract deployed to: 0x... (Your new site address)
+✅ Owner set to: 0x... (Your wallet address)
+```
 ---
 
-## Step 4: Fetch Your Content
+## 3. Configuring Your Site with Presets
 
-Retrieve your uploaded content:
+For most common use cases, you don't need to write custom deployment scripts. You can configure caching, headers, and CORS rules directly from the command line using presets.
+
+| Flag | Preset | Description |
+| :--- | :--- | :--- |
+| `--header-preset` | `static-website` | Sets standard caching and content type headers for a typical static site. |
+| | `dynamic-api` | Disables caching and sets JSON content type for API-like use cases. |
+| | `immutable` | Sets long-term caching for content that will never change. |
+| `--cors-preset` | `allow-all` | Allows cross-origin requests from any domain. **Use with caution.** |
+| | `same-origin` | Enforces a strict same-origin policy. |
+| | `allow-wttp` | Allows requests from other WTTP-powered sites. |
+| `--cache-preset` | `aggressive` | Sets a long `max-age` (1 year) for all resources. |
+| | `standard` | Sets a moderate `max-age` (1 hour). This is the default. |
+| | `none` | Disables caching entirely. |
+
+#### Example Usage
+
+Deploy a site optimized to serve an immutable NFT collection with aggressive caching and open CORS policies.
 
 ```bash
-# Get your file back (just like HTTP GET!)
-npx hardhat run scripts/get-file.js --network sepolia
+npx hardhat deploy:site \
+  --header-preset immutable \
+  --cache-preset aggressive \
+  --cors-preset allow-all \
+  --network sepolia
 ```
 
-**The script prompts:**
-```
-Site address: 0x742d35Cc6523C0532...
-Resource name: /index.html
-```
-
-**You'll see:**
-```html
-<!DOCTYPE html>
-<html>
-<head>
-    <title>My First WTTP Site</title>
-</head>
-<body>
-    <h1>Hello, Decentralized Web!</h1>
-    <p>This page is hosted on the blockchain using WTTP.</p>
-</body>
-</html>
+You can also override any specific default. For example, to set a custom cache age:
+```bash
+# Set cache to 2 hours (7200 seconds)
+npx hardhat deploy:site --max-age 7200 --network sepolia
 ```
 
 ---
 
-## Step 5: Set Up Permissions
+## 4. Managing Website Content
 
-Control who can access your site:
+WTTP provides simple tasks for uploading and retrieving files.
+
+### `upload:directory`
+The easiest way to upload a full website. This task recursively uploads all files from a local directory to your on-chain site.
 
 ```bash
-# Make your site publicly readable
-npx hardhat run scripts/set-permissions.js --network sepolia
+# Uploads the contents of the `my-website` folder to the root of your on-chain site
+npx hardhat upload:directory \
+  --site <YOUR_SITE_ADDRESS> \
+  --source ./my-website \
+  --network sepolia
+```
+> **Critical Tip:** This command is idempotent. If you run it again, it will only upload new or changed files, saving you gas. It automatically handles content hashing and chunking.
+
+### `upload:file`
+To upload a single file.
+
+```bash
+# Upload a single index.html file
+npx hardhat upload:file \
+  --site <YOUR_SITE_ADDRESS> \
+  --source ./index.html \
+  --destination /index.html \
+  --network sepolia
 ```
 
-**Permission options:**
-- **Private**: Only you can read/write
-- **Public Read**: Anyone can read, only you can write
-- **Community**: Specific users can write
-- **Open**: Anyone can read and write (use carefully!)
+### `fetch`
+To retrieve the raw content of an on-chain resource.
+
+```bash
+# Fetch the content of /index.html from your site
+npx hardhat fetch \
+  --site <YOUR_SITE_ADDRESS> \
+  --path /index.html \
+  --network sepolia
+```
 
 ---
 
 ## 🎉 Congratulations!
 
-You've successfully:
-- ✅ Deployed a WTTP site contract
-- ✅ Uploaded your first file to the blockchain
-- ✅ Retrieved content using GET method
-- ✅ Set up access permissions
+You now have a live, on-chain website that is as decentralized and resilient as the Ethereum network itself.
 
-**Your website is now living on the blockchain!**
-
----
-
-## What's Next?
-
-Now that you have the basics, explore more advanced features:
-
-1. **[Upload a Complete Website](../tutorials/upload-website-files.md)** - Deploy multiple files and folders
-2. **[Permission Management](../tutorials/permission-management.md)** - Fine-tune who can access what
-3. **[Common Use Cases](common-use-cases.md)** - See what others are building
-4. **[API Integration](../api-reference/)** - Connect your apps to WTTP
+### What's Next?
+- **[Upload a Complete Website](../tutorials/upload-website-files.md)**: A deeper dive into the `upload:directory` task.
+- **[Manage Permissions](../tutorials/permission-management.md)**: Learn how to grant access to others or make your site public.
+- **[Explore Examples](../examples/)**: See real-world examples for blogs, file storage, and more.
 
 ---
 

@@ -77,8 +77,12 @@ event ResourceDeleted(string path);
 error InvalidHeader(HeaderInfo header);
 /// @notice Error thrown when attempting to modify an immutable resource
 /// @param path Path of the immutable resource
-
 /// @dev WTTP revert status codes are prefixed with _ so handler can parse the error codes
+
+/// @notice Error thrown when a request is malformed
+/// @param reason Reason for the error
+/// @param body Body of the error, additional custom context
+error _400(string reason, string body);
 
 /// @notice Error thrown when an account lacks permission for a role
 /// @param reason Reason for the error
@@ -95,7 +99,7 @@ error _404(string reason, bool isImmutable);
 error _405(string reason, uint16 methodsAllowed, bool isImmutable);
 /// @notice Error thrown when attempting to modify an immutable resource
 /// @param reason Reason for the error
-/// @param body Body of the error
+/// @param body Body of the error, additional custom context
 error _409(string reason, string body);
 /// @notice Error thrown when a resource has been permanently deleted
 /// @param reason Reason for the error
@@ -472,7 +476,13 @@ function normalizeRange_(
     uint256 totalLength
 ) pure returns (Range memory) {
 
-    // if the range is 0,0, set the end to the last index
+    // if range is -1, 0 treat as 0,0, since 0, 0 is treated as full range
+    if (range.start == -1 && range.end == 0) {
+        range.start = 0;
+        range.end = 0;
+    }
+
+    // if the range is 0,0, set the end to the last index for full range
     if (range.end == 0 && range.start == 0) {
         range.end = int256(totalLength) - 1;
         return range;

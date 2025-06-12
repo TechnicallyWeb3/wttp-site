@@ -1,3 +1,7 @@
+<!--
+© 2025 TechnicallyWeb3 – Licensed under AGPL-3.0
+-->
+
 # Common WTTP Use Cases
 
 ## Real-World Applications of Blockchain Web Hosting

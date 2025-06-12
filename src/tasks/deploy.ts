@@ -15,9 +15,21 @@ task("deploy:site", "Deploy a single Web3Site contract with funding checks")
   )
   .addOptionalParam(
     "cachePreset",
-    "Cache preset (0=NONE, 1=NO_CACHE, 2=DEFAULT, 3=SHORT, 4=MEDIUM, 5=LONG, 6=PERMANENT)",
+    "Cache preset (0=NONE, 1=NO_CACHE, 2=DEFAULT, 3=SHORT, 4=MEDIUM, 5=LONG, 6=PERMANENT) or (none|short|medium|long|aggressive|permanent)",
     "3",
-    types.int
+    types.string
+  )
+  .addOptionalParam(
+    "headerPreset",
+    "Header preset (basic|development|production)",
+    undefined,
+    types.string
+  )
+  .addOptionalParam(
+    "corsPreset", 
+    "CORS preset (permissive|strict|basic)",
+    undefined,
+    types.string
   )
   .addFlag(
     "skipVerify",
@@ -31,7 +43,7 @@ task("deploy:site", "Deploy a single Web3Site contract with funding checks")
     console.log(`🚀 Web3Site Deployment Task`);
     console.log(`🌐 Network: ${hre.network.name}\n`);
 
-    const { dpr, owner, cachePreset, skipVerify, autoFund } = taskArgs;
+    const { dpr, owner, cachePreset, headerPreset, corsPreset, skipVerify, autoFund } = taskArgs;
     
     try {
       // Get signers
@@ -41,8 +53,7 @@ task("deploy:site", "Deploy a single Web3Site contract with funding checks")
       }
 
       const deployer = signers[0];
-      const ownerSigner = signers.length > 1 ? signers[1] : signers[0];
-      const ownerAddress = owner || ownerSigner.address;
+      const ownerAddress = owner || signers[0].address;
 
       console.log(`👤 Deployer: ${deployer.address}`);
       console.log(`👤 Owner: ${ownerAddress}`);
@@ -101,9 +112,58 @@ task("deploy:site", "Deploy a single Web3Site contract with funding checks")
 
       console.log(`⚙️  Cache preset: ${cachePreset}`);
 
+      // Named cache preset support (Alex's Phase 2 requirement)
+      const cachePresets: { [key: string]: number } = { 
+        none: 0, 
+        short: 2, 
+        medium: 3, 
+        long: 4, 
+        aggressive: 5, 
+        permanent: 6 
+      };
+
+      // Convert string cache presets to numeric values
+      const cacheValue = typeof cachePreset === 'string' 
+        ? (cachePresets[cachePreset] !== undefined ? cachePresets[cachePreset] : parseInt(cachePreset)) 
+        : cachePreset;
+
+      console.log(`⚙️  Cache preset resolved: ${cacheValue} (from '${cachePreset}')`);
+
+      // Apply header presets based on Alex's specifications
+      const headerPresets: { [key: string]: { cache: number; cors: number } } = {
+        basic: { cache: 3, cors: 1 },
+        development: { cache: 1, cors: 2 }, 
+        production: { cache: 5, cors: 0 }
+      };
+
+      const corsPresets: { [key: string]: number } = {
+        permissive: 2,
+        strict: 0,
+        basic: 1
+      };
+
+      // Apply header preset if specified
+      if (headerPreset && headerPresets[headerPreset]) {
+        const preset = headerPresets[headerPreset];
+        defaultHeader.cache.preset = preset.cache;
+        defaultHeader.cors.preset = preset.cors;
+        console.log(`🎛️  Applied header preset '${headerPreset}': cache=${preset.cache}, cors=${preset.cors}`);
+      }
+
+      // Apply CORS preset if specified (can override header preset)
+      if (corsPreset && corsPresets[corsPreset]) {
+        defaultHeader.cors.preset = corsPresets[corsPreset];
+        console.log(`🌐 Applied CORS preset '${corsPreset}': cors=${corsPresets[corsPreset]}`);
+      }
+
+      // Apply cache preset (can override header preset)
+      if (cacheValue !== undefined) {
+        defaultHeader.cache.preset = cacheValue;
+      }
+
       // Check balances and estimate costs
       const deployerBalance = await hre.ethers.provider.getBalance(deployer.address);
-      const ownerBalance = await hre.ethers.provider.getBalance(ownerSigner.address);
+      const ownerBalance = await hre.ethers.provider.getBalance(signers[0].address);
       
       console.log(`💰 Deployer balance: ${hre.ethers.formatEther(deployerBalance)} ETH`);
       console.log(`💰 Owner balance: ${hre.ethers.formatEther(ownerBalance)} ETH`);
@@ -123,7 +183,7 @@ task("deploy:site", "Deploy a single Web3Site contract with funding checks")
 
       const feeData = await hre.ethers.provider.getFeeData();
       const gasPrice = feeData.gasPrice || hre.ethers.parseUnits("20", "gwei");
-      const estimatedCost = gasEstimate * gasPrice * 110n / 100n; // 10% buffer
+      const estimatedCost = gasEstimate * gasPrice * BigInt(110) / BigInt(100); // 10% buffer
 
       console.log(`⛽ Estimated cost: ${hre.ethers.formatEther(estimatedCost)} ETH (${gasEstimate.toString()} gas)`);
 
@@ -142,7 +202,7 @@ task("deploy:site", "Deploy a single Web3Site contract with funding checks")
         }
 
         console.log(`💸 Funding deployer with ${hre.ethers.formatEther(fundingNeeded)} ETH...`);
-        const fundingTx = await ownerSigner.sendTransaction({
+        const fundingTx = await signers[0].sendTransaction({
           to: deployer.address,
           value: fundingNeeded,
           gasLimit: 21000n
