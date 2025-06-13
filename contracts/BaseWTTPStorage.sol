@@ -285,10 +285,12 @@ abstract contract BaseWTTPStorage is BaseWTTPPermissions {
         string memory _path,
         Range memory _range
     ) internal virtual view returns (bytes32[] memory) { 
+        // we should set a max range size to prevent DOS attacks
         Range memory _normalizedRange = normalizeRange_(_range, _resourceDataPoints(_path));
         uint256 _resourceLength = uint256(_normalizedRange.end - _normalizedRange.start + 1);
-        bytes32[] memory _dataPoints = new bytes32[](_resourceLength);
-        for (uint256 i = 0; i < _resourceLength; i++) {
+        uint256 _returnLength = _resourceLength > MAX_RANGE_SIZE ? MAX_RANGE_SIZE : _resourceLength;
+        bytes32[] memory _dataPoints = new bytes32[](_returnLength);
+        for (uint256 i = 0; i < _returnLength; i++) {
             _dataPoints[i] = resource[_path][uint256(_normalizedRange.start) + i];
         }
         return _dataPoints;

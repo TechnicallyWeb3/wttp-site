@@ -76,7 +76,8 @@ task("site:fetch", "Fetch a resource from a WTTP site via the WTTPGateway")
         console.log("\n=== Content ===");
         if (isText(mimeTypeBytes)) {
           const maxContentLength = 1000;
-          console.log(`Data: ${hre.ethers.toUtf8String(resource.content).substring(0, maxContentLength)}... (truncated, ${resourceSize} bytes total)`);
+          const truncatedMessage = resource.content.length > maxContentLength ? `... (truncated, ${resourceSize} bytes total)` : "";
+          console.log(`Data: ${hre.ethers.toUtf8String(resource.content).substring(0, maxContentLength)}${truncatedMessage}`);
         } else {
           console.log(`Data: ${resourceSize} bytes`); // remove the 0x prefix
         }
