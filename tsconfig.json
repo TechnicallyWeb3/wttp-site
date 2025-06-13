@@ -15,12 +15,13 @@
   },
   "include": [
     "src/**/*",
+    "test/**/*",
     "hardhat.config.ts",
     "typechain-types/**/*",
-    "test/**/*"
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "dist",
+    "docs",
   ]
 }

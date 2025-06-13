@@ -2,7 +2,7 @@
 // but allow direct import from ethers package when imported
 
 import { ethers } from "hardhat";
-import type { Web3Site } from "../../typechain-types";
+import { HEADRequestStruct, ORIGINS_ADMIN_ONLY, type HEADResponseStruct, type IBaseWTTPSite, type LOCATEResponseStruct, type RangeStruct } from "@wttp/core";
 // import { getContractAddress } from "@tw3/esp";
 
 /**
@@ -13,88 +13,132 @@ import type { Web3Site } from "../../typechain-types";
  * @param options - Optional parameters for the request
  * @returns The response from the site with full content
  */
-export async function fetchResourceFromSite(
+export async function fetchResource(
   siteAddress: string,
-  path: string,
+  path?: string,
   options: {
     ifModifiedSince?: number,
     ifNoneMatch?: string,
+    range?: RangeStruct,
     headRequest?: boolean,
+    datapoints?: boolean,
     chainId?: number
-  } = {}
-) {
+  } = {},
+): Promise<{
+  response: LOCATEResponseStruct,
+  content?: Uint8Array,
+}> {
   // Parameter validation
   if (!siteAddress) {
+    // TODO: should validate that siteAddress is a valid address
     throw new Error("Site address is required");
   }
   if (!path) {
-    throw new Error("Resource path is required");
+    path = "/";
   }
   if (!path.startsWith('/')) {
     throw new Error("Resource path must start with '/'");
   }
   
-  const { ifModifiedSince = 0, ifNoneMatch = ethers.ZeroHash, headRequest = false, chainId } = options;
+  const { 
+    ifModifiedSince = 0, 
+    ifNoneMatch = ethers.ZeroHash,
+    range = { start: 0, end: 0 } as RangeStruct,
+    headRequest = false, 
+    datapoints = true,
+    chainId 
+  } = options;
 
   console.log(`🌐 Connecting to site: ${siteAddress}`);
   console.log(`📄 Requesting resource: ${path}${headRequest ? ' (HEAD only)' : ''}`);
 
   // Get the site contract with error handling
-  let siteContract: Web3Site;
+  let siteContract: IBaseWTTPSite;
   try {
-    siteContract = await ethers.getContractAt("Web3Site", siteAddress) as Web3Site;
+    siteContract = await ethers.getContractAt("Web3Site", siteAddress) as IBaseWTTPSite;
   } catch (error) {
     throw new Error(`Failed to connect to site contract at ${siteAddress}: ${error}`);
   }
 
   // Create the request - updated to new structure without requestLine wrapper
-  const headRequest_obj = {
+  const headRequest_obj: HEADRequestStruct = {
     path: path,
     ifModifiedSince,
     ifNoneMatch
   };
 
+  let head: HEADResponseStruct = {
+    status: 404n,
+    headerInfo: {
+      cache: {immutableFlag: false, preset: 0n, custom: ""},
+      cors: {
+        methods: 1n, 
+        origins: ORIGINS_ADMIN_ONLY, 
+        preset: 0n, 
+        custom: ""
+      },
+      redirect: {code: 0n, location: ""}
+    },
+    metadata: { 
+      properties: { 
+        mimeType: "0x0000", 
+        charset: "0x0000", 
+        encoding: "0x0000", 
+        language: "0x0000" 
+      },
+      size: 0n,
+      version: 0n,
+      lastModified: 0n,
+      header: ethers.ZeroHash
+    },
+    etag: ethers.ZeroHash
+  };
+
   // If it's a HEAD request, just call HEAD
   if (headRequest) {
-    console.log(`Sending HEAD request for ${path}`);
-    const response = await siteContract.HEAD(headRequest_obj);
+    console.log(`Sending HEAD request for ${path} from site ${siteAddress}`);
+    try {
+      head = await siteContract.HEAD(headRequest_obj) as HEADResponseStruct;
+    } catch (error: any) {
+      console.log(error.message);
+    }
+
+    return { response: { head, dataPoints: [] }, content: undefined };
+
+  } else {
+    // For GET requests, use the site's GET method which returns LOCATEResponse
+    console.log(`Fetching resource at ${path} from site ${siteAddress}`);
+    
+    let locateResponse: LOCATEResponseStruct;
+    try {
+      locateResponse = await siteContract.GET({head: headRequest_obj, rangeChunks: range}) as LOCATEResponseStruct;
+    } catch (error: any) {
+      console.log(error);
+      locateResponse = {
+        head: head,
+        dataPoints: []
+      };
+    }
+    
+    // Updated to use new response structure without responseLine wrapper
+    console.log(`Response status: ${locateResponse.head.status}`);
+    console.log(`Found ${locateResponse.dataPoints.length} data points`);
+
+    // If the response is successful and user wants data (no --datapoints flag), load the content
+    let content: Uint8Array | undefined = undefined;
+    if (!datapoints) {
+      if ((locateResponse.head.status === 200n || locateResponse.head.status === 206n) 
+          && locateResponse.dataPoints.length > 0) {
+        const dataPointAddresses: string[] = locateResponse.dataPoints.map(dp => dp.toString());
+        content = await readDataPointsContent(siteAddress, dataPointAddresses, chainId);
+      }
+    }
+
     return {
-      type: 'HEAD' as const,
-      response
+      response: locateResponse,
+      content
     };
   }
-
-  // For GET requests, use the site's GET method which returns LOCATEResponse
-  console.log(`Fetching resource at ${path} from site ${siteAddress}`);
-  
-  // Create LOCATERequest with HEADRequest and range for chunked requests
-  const locateRequest = {
-    head: headRequest_obj,
-    rangeChunks: {
-      start: 0,  // Start from first chunk
-      end: 0     // 0 means to end
-    }
-  };
-  
-  const locateResponse = await siteContract.GET(locateRequest);
-  
-  // Updated to use new response structure without responseLine wrapper
-  console.log(`Response status: ${locateResponse.head.status}`);
-  console.log(`Found ${locateResponse.dataPoints.length} data points`);
-
-  // If the response is successful and has datapoints, read the content
-  let content: Uint8Array | null = null;
-  
-  if ((locateResponse.head.status === 200n || locateResponse.head.status === 206n) 
-      && locateResponse.dataPoints.length > 0) {
-    content = await readDataPointsContent(siteAddress, locateResponse.dataPoints, chainId);
-  }
-
-  return {
-    type: 'GET' as const,
-    response: locateResponse,
-    content
-  };
 }
 
 /**
@@ -118,8 +162,10 @@ export async function readDataPointsContent(
   }
   
   // Get the site contract to access DPS
-  const siteContract = await ethers.getContractAt("Web3Site", siteAddress) as Web3Site;
+  const siteContract = await ethers.getContractAt("Web3Site", siteAddress) as IBaseWTTPSite;
   const dpsAddress = await siteContract.DPS();
+
+  console.log(`🔗 Loading DPS at address ${dpsAddress}...`);
   
   // Get the DPS contract
   const dpsContract = await ethers.getContractAt("DataPointStorage", dpsAddress);
@@ -182,50 +228,12 @@ export async function main(
   options: {
     ifModifiedSince?: number,
     ifNoneMatch?: string,
+    range?: RangeStruct,
     headRequest?: boolean,
+    datapoints?: boolean,
     chainId?: number
-  } = {}
+  } = {},
 ) {
   // Fetch the resource directly from the site
-  const result = await fetchResourceFromSite(siteAddress, path, options);
-  
-  let content: string | null = null;
-  let rawData: Uint8Array | null = null;
-  
-  if (result.type === 'HEAD') {
-    // For HEAD requests, return just the metadata - updated to use new response structure
-    return {
-      status: result.response.status,
-      metadata: result.response.metadata,
-      etag: result.response.etag,
-      content: null,
-      rawData: null
-    };
-  } else {
-    // For GET requests, process the content
-    const getResponse = result.response;
-    rawData = result.content;
-    
-    // Updated to use new response structure
-    if (getResponse.head.status === 200n || getResponse.head.status === 206n) {
-      if (rawData && rawData.length > 0) {
-        // Convert the response data to a string if it's text
-        const mimeType = getResponse.head.metadata.properties.mimeType;
-        
-        if (isText(mimeType)) {
-          content = ethers.toUtf8String(rawData);
-        } else {
-          content = `<Binary data: ${rawData.length} bytes>`;
-        }
-      }
-    }
-    
-    return {
-      status: getResponse.head.status,
-      metadata: getResponse.head.metadata,
-      etag: getResponse.head.etag,
-      content,
-      rawData
-    };
-  }
+  return await fetchResource(siteAddress, path, options);
 }

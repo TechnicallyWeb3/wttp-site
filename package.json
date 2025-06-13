@@ -75,6 +75,8 @@
   "homepage": "https://github.com/TechnicallyWeb3/wttp-site#readme",
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@types/mime-types": "^3.0.1",
+    "@wttp/site": "^0.0.2",
     "hardhat": "^2.24.2",
     "hardhat-change-network": "^0.0.7",
     "hardhat-contract-sizer": "^2.10.0",
@@ -83,6 +85,6 @@
     "shx": "^0.3.4"
   },
   "peerDependencies": {
-    "@wttp/core": "^0.2.8"
+    "@wttp/core": "^0.2.10"
   }
 }

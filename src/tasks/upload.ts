@@ -6,10 +6,10 @@ function isDirectory(sourcePath: string): boolean {
   return fs.statSync(sourcePath).isDirectory();
 }
 
-task("upload", "Upload a file or directory to a WTTP site")
+task("site:upload", "Upload a file or directory to a WTTP site")
   .addParam("site", "The address of the WTTP site")
   .addParam("source", "The source file or directory path")
-  .addParam("destination", "The destination path on the WTTP site")
+  .addOptionalParam("destination", "The destination path on the WTTP site", "/")
   .setAction(async (taskArgs, hre) => {
     const { site, source, destination } = taskArgs;
     

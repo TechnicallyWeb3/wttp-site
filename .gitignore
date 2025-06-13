@@ -3,6 +3,8 @@ node_modules
 
 /dist
 /contracts/test/
+/contracts/interfaces
+/docs
 
 # Hardhat files
 /cache

@@ -1,85 +1,103 @@
 import { task } from "hardhat/config";
-import { IWTTPGateway, IWTTPGateway__factory } from "@wttp/core";
+import { IBaseWTTPSite, RangeStruct } from "@wttp/core";
+import { loadContract } from "@tw3/esp";
 
-task("fetch", "Fetch a resource from a WTTP site via the WTTPGateway")
-  .addParam("wttp", "The address of the WTTPGateway")
-  .addParam("site", "The address of the WTTP site")
-  .addParam("path", "The path to the resource")
+task("site:fetch", "Fetch a resource from a WTTP site via the WTTPGateway")
+  .addOptionalParam("url", "The URL of the WTTP site")
+  .addOptionalParam("site", "The address of the WTTP site")
+  .addOptionalParam("path", "The path to the resource", "/")
   .addOptionalParam("range", "Byte range in format 'start-end' (e.g., '10-20')")
   .addOptionalParam("ifModifiedSince", "Unix timestamp for If-Modified-Since header")
   .addOptionalParam("ifNoneMatch", "ETag value for If-None-Match header")
   .addFlag("head", "Perform a HEAD request instead of GET")
+  .addFlag("datapoints", "Fetch datapoints instead of resource data")
   .setAction(async (taskArgs, hre) => {
+
+    if (!taskArgs.url && !taskArgs.site) {
+      throw new Error("Either --url or --site must be provided");
+    }
+
+    if (taskArgs.url && taskArgs.site) {
+      console.log("WARNING: Both --url and --site provided, using --url");
+    }
+
+    if (taskArgs.url) {
+      const url = new URL(taskArgs.url);
+      taskArgs.site = url.hostname;
+      taskArgs.path = url.pathname;
+    }
 
     const { fetchResource, isText } = require("../scripts/fetchResource");
     const { bytes2ToMimeType } = require("../scripts/uploadFile");
-    const { wttp, site, path, range, ifModifiedSince, ifNoneMatch, head } = taskArgs;
-
-    const gateway: IWTTPGateway = IWTTPGateway__factory.connect(wttp, hre.ethers.provider);
+    const { site, path, range, ifModifiedSince, ifNoneMatch, head, datapoints } = taskArgs;
     
     // Parse range if provided
-    let rangeOption = undefined;
+    let rangeOption: RangeStruct | undefined = undefined;
     if (range) {
       const [start, end] = range.split("-").map((n: string) => parseInt(n.trim()));
-      rangeOption = { start, end };
+      rangeOption = { start, end } as RangeStruct;
     }
     
     // Parse ifModifiedSince if provided
     const ifModifiedSinceOption = ifModifiedSince ? parseInt(ifModifiedSince) : undefined;    
     // Fetch the resource
-    const response = await fetchResource(
-      gateway,
+    const resource = await fetchResource(
       site,
       path,
       {
         range: rangeOption,
         ifModifiedSince: ifModifiedSinceOption,
         ifNoneMatch,
-        headRequest: head
-      }
+        headRequest: head,
+        datapoints,
+      },
     );
+    // console.log(response);
 
     console.log("\n=== WTTP Response ===");
-    let headData = undefined;
-    let mimeType = undefined;
-    if (head) {
-      headData = response;
-      mimeType = headData.metadata.properties.mimeType;
-      console.log("\n=== HEAD Response ==="); 
-    } else {
-      headData = response.head;
-      mimeType = headData.metadata.properties.mimeType;
-      console.log("\n=== GET Response ===");
-      console.log("\n=== Content ===");
-      if (isText(mimeType)) {
-        console.log(`Data: ${hre.ethers.toUtf8String(response.data)}`);
-      } else {
-        console.log(`Data: ${response.data.length - 2} bytes`); // remove the 0x prefix
-      }
-      console.log("================\n");
+    const status = resource.response.head.status;
+    console.log(`Status: ${status}`);
+    if (status >= 300n && status < 310n) {
+      console.log(`Redirect: ${resource.response.head.headerInfo.redirect.location}`);
     }
 
-    console.log(`ETag: ${headData.etag}`);
-    console.log(`Last Modified: ${new Date(Number(headData.metadata.lastModified) * 1000).toISOString()}`);
-    console.log(`Content-Type: ${bytes2ToMimeType(mimeType)}`);
-    console.log(`Charset: ${headData.metadata.properties.charset}`);
-    console.log(`Encoding: ${headData.metadata.properties.encoding}`);
-    console.log(`Language: ${headData.metadata.properties.language}`);
-    console.log(`Size: ${headData.metadata.size} bytes`);
-    console.log(`Version: ${headData.metadata.version}`);
-    
-    if (response.content) {
-      console.log("\n=== Content ===");
-      // If content is too large, truncate it
-      const maxContentLength = 1000;
-      if (response.content.length > maxContentLength) {
-        console.log(`${response.content.substring(0, maxContentLength)}... (truncated, ${response.content.length} bytes total)`);
-      } else {
-        console.log(response.content);
+    const metadata = resource.response.head.metadata;
+    const resourceSize = metadata.size;
+    const mimeTypeBytes = metadata.properties.mimeType;
+
+    if (head) {
+      console.log("\n=== HEAD Response ==="); 
+      if (datapoints) {
+        console.log("\nWARNING: --datapoints is not supported for HEAD requests");
+      }
+    } else {
+      console.log("\n=== GET Response ===");
+      if (!datapoints) {
+        console.log("\n=== Content ===");
+        if (isText(mimeTypeBytes)) {
+          const maxContentLength = 1000;
+          console.log(`Data: ${hre.ethers.toUtf8String(resource.content).substring(0, maxContentLength)}... (truncated, ${resourceSize} bytes total)`);
+        } else {
+          console.log(`Data: ${resourceSize} bytes`); // remove the 0x prefix
+        }
+        console.log("================\n");
       }
     }
+
+    console.log(`Content-Type: ${bytes2ToMimeType(mimeTypeBytes)}`);
+    console.log(`Charset: ${metadata.properties.charset}`);
+    console.log(`Encoding: ${metadata.properties.encoding}`);
+    console.log(`Language: ${metadata.properties.language}`);
+    console.log(`Size: ${metadata.size} bytes`);
+    console.log(`Version: ${metadata.version}`); 
+    console.log(`ETag: ${resource.response.head.etag}`);
+    console.log(`Last Modified: ${new Date(Number(metadata.lastModified) * 1000).toISOString()}`);
+
+    if (datapoints) {
+      console.log(`Datapoints: ${resource.response.dataPoints}`);
+    }
     
-    return response;
+    return resource;
   });
 
 export default {};

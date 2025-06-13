@@ -1,5 +1,8 @@
+import { DataPointStorage__factory, DataPointRegistry__factory } from "@tw3/esp";
+import { ALL_METHODS_BITMASK, ORIGINS_PUBLIC, PUBLIC_HEADER } from "@wttp/core";
 import { task, types } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 task("site:deploy", "Deploy a single Web3Site contract with funding checks")
   .addOptionalParam(
@@ -54,7 +57,7 @@ task("site:deploy", "Deploy a single Web3Site contract with funding checks")
       }
 
       const deployer = signers[0];
-      const ownerAddress = owner || signers[0].address;
+      const ownerAddress = owner || deployer.address; // default to deployer as owner
 
       console.log(`👤 Deployer: ${deployer.address}`);
       console.log(`👤 Owner: ${ownerAddress}`);
@@ -65,55 +68,15 @@ task("site:deploy", "Deploy a single Web3Site contract with funding checks")
         dprAddress = dpr;
         console.log(`📍 Using custom DPR: ${dprAddress}`);
       } else {
-        const { getContractAddress } = await import("@tw3/esp");
-        const chainId = hre.network.config.chainId;
-        if (!chainId) {
-          throw new Error("ChainId not configured");
-        }
-        
-        // Add fallback for local testing
-        if (hre.network.name === "hardhat" || hre.network.name === "localhost") {
-          dprAddress = "0x0000000000000000000000000000000000000001"; // Test DPR address for local testing
-          console.log(`📍 Using test DPR for local network: ${dprAddress}`);
-        } else {
-          dprAddress = getContractAddress(chainId, "dpr");
-          console.log(`📍 Using @tw3/esp DPR: ${dprAddress}`);
-        }
+        dprAddress = await deployOrLoadTestEsp(hre);
       }
 
       // Create default header - fixed to match contract requirements
-      const defaultHeader = {
-        cache: {
-          immutableFlag: false,
-          preset: cachePreset,
-          custom: ""
-        },
-        cors: {
-          methods: 511, // All methods allowed (9 bits for 9 methods)
-          origins: [
-            // Origins array must have 9 elements to match 9 methods (OPTIONS through DELETE)
-            "0x0000000000000000000000000000000000000000000000000000000000000000", // PUBLIC role for all methods
-            "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "0x0000000000000000000000000000000000000000000000000000000000000000"
-          ],
-          preset: 1, // PUBLIC preset
-          custom: ""
-        },
-        redirect: {
-          code: 0,
-          location: ""
-        }
-      };
+      const defaultHeader = PUBLIC_HEADER;
 
       console.log(`⚙️  Cache preset: ${cachePreset}`);
 
-      // Named cache preset support (Alex's Phase 2 requirement)
+      // Named cache preset support
       const cachePresets: { [key: string]: number } = { 
         none: 0, 
         short: 2, 
@@ -164,7 +127,7 @@ task("site:deploy", "Deploy a single Web3Site contract with funding checks")
 
       // Check balances and estimate costs
       const deployerBalance = await hre.ethers.provider.getBalance(deployer.address);
-      const ownerBalance = await hre.ethers.provider.getBalance(signers[0].address);
+      const ownerBalance = await hre.ethers.provider.getBalance(ownerAddress);
       
       console.log(`💰 Deployer balance: ${hre.ethers.formatEther(deployerBalance)} ETH`);
       console.log(`💰 Owner balance: ${hre.ethers.formatEther(ownerBalance)} ETH`);
@@ -388,5 +351,74 @@ task("site:verify", "Verify deployed Web3Site contract")
       }
     }
   });
+
+
+type ESPConstructorArgs = {
+  owner?: string;
+  dps?: string;
+  royaltyRate?: number;
+}
+
+async function deployOrLoadTestEsp(hre: HardhatRuntimeEnvironment, deploymentArgs: ESPConstructorArgs = {}, signer?: HardhatEthersSigner) {
+  const { addLocalhostDeployment, getContractAddress, getSupportedChainIds } = await import("@tw3/esp");
+  if (!hre.network.config.chainId) {
+    throw new Error("ChainId not configured");
+  }
+  if (getSupportedChainIds().includes(hre.network.config.chainId)) {
+    console.log(`📍 Using @tw3/esp DPR: ${getContractAddress(hre.network.config.chainId, "dpr")}`);
+    return getContractAddress(hre.network.config.chainId, "dpr");
+  } else {
+    const signers = await hre.ethers.getSigners();
+    if (signers.length === 0) {
+      throw new Error("No signers available");
+    }
+    const deployer = signers[0];
+    // Deploy test ESP
+    // try {
+      // deploying the test ESP
+      if (!deploymentArgs?.dps) {
+        let dpsFactory;
+        const dpsAbi = DataPointStorage__factory.abi as any;
+        const dpsBytecode = DataPointStorage__factory.bytecode;
+        if (!signer) {
+          dpsFactory = await hre.ethers.getContractFactory(dpsAbi, dpsBytecode);
+        } else {
+          dpsFactory = await hre.ethers.getContractFactory(dpsAbi, dpsBytecode, signer);
+        }
+        const dps = await dpsFactory.deploy();
+        await dps.waitForDeployment();
+        deploymentArgs.dps = await dps.getAddress();
+        console.log(`📍 Using test DPS(temporary deployment): ${deploymentArgs.dps}`);
+      }
+      if (!deploymentArgs?.royaltyRate) {
+        deploymentArgs.royaltyRate = 1000;
+      }
+
+      if (!deploymentArgs?.owner) {
+        deploymentArgs.owner = deployer.address;
+      }
+      console.log(`Deployment args: ${JSON.stringify(deploymentArgs)}`);
+      const dprAbi = DataPointRegistry__factory.abi as any;
+      const dprBytecode = DataPointRegistry__factory.bytecode;
+      let dprFactory;
+      if (!signer) {
+        dprFactory = await hre.ethers.getContractFactory(dprAbi, dprBytecode);
+      } else {
+        dprFactory = await hre.ethers.getContractFactory(dprAbi, dprBytecode, signer);
+      }
+
+      const dpr = await dprFactory.deploy(deploymentArgs.owner, deploymentArgs.dps, deploymentArgs.royaltyRate);
+      await dpr.waitForDeployment();
+      const dprAddress = await dpr.getAddress();
+      console.log(dprAddress);
+      console.log(`📍 Using test DPR(temporary deployment): ${dprAddress}`);
+      return dprAddress;
+    // } catch (error) {
+      console.log(`📍 Using mock DPR(no deployment): 0x0000000000000000000000000000000000000001`);
+      return "0x0000000000000000000000000000000000000001";
+    // }
+  }
+
+}
 
 export default {};

@@ -1,27 +1,11 @@
 import hre from "hardhat";
-import { formatEther, parseUnits, toUtf8Bytes } from "ethers";
-import { Web3Site } from "../../typechain-types";
-import { addDeployment, formatDeploymentData } from './AddDeployment';
+import { formatEther, parseUnits } from "ethers";
 import { getContractAddress } from "@tw3/esp";
+import { READ_ONLY_PUBLIC_HEADER } from "@wttp/core"
+import { Web3Site } from "../../typechain-types";
 
 // Default header configuration for WTTP sites - updated to new structure
-const DEFAULT_HEADER = {
-  cache: {
-    immutableFlag: false,
-    preset: 3, // MEDIUM cache preset
-    custom: ""
-  },
-  cors: {
-    methods: 511, // All methods allowed (bitmask for all 9 methods)
-    origins: [],
-    preset: 1, // PUBLIC CORS preset
-    custom: ""
-  },
-  redirect: {
-    code: 0,
-    location: ""
-  }
-};
+const DEFAULT_HEADER = READ_ONLY_PUBLIC_HEADER;
 
 // After DEFAULT_HEADER declaration, add exported interface
 export interface DeploymentResult {

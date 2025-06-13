@@ -1,0 +1,10 @@
+{
+  "directory": {
+    "example.txt": {
+      "mimeType": "text/plain",
+      "charset": "utf-8",
+      "encoding": "identity",
+      "language": "en-US"
+    }
+  }
+}

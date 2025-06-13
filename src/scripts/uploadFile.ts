@@ -1,11 +1,14 @@
 import { ethers } from "hardhat";
 import fs from "fs";
 import path from "path";
-import { Web3Site } from "../../typechain-types";
+import { HEADResponseStructOutput, IBaseWTTPSite, LOCATERequestStruct, LOCATEResponseStruct, LOCATEResponseStructOutput } from "@wttp/core";
+import mime from "mime-types";
+import { fetchResource } from "./fetchResource";
 
 // Constants
 const CHUNK_SIZE = 32 * 1024; // 32KB chunks
-// const WTTP_VERSION = "WTTP/3.0";
+const WTTP_FILE_WARN = 100 * 1024 * 1024; // 100MB warning
+const WTTP_FILE_LIMIT = 400 * 1024 * 1024; // 400MB limit
 
 // Helper function to chunk file data
 function chunkData(data: Buffer, chunkSize: number): Buffer[] {
@@ -18,38 +21,20 @@ function chunkData(data: Buffer, chunkSize: number): Buffer[] {
 
 // Helper function to determine MIME type from file extension
 export function getMimeType(filePath: string): string {
-  const ext = path.extname(filePath).toLowerCase();
-  const mimeTypes: Record<string, string> = {
-    "/": "directory",
-    ".html": "text/html",
-    ".css": "text/css", 
-    ".js": "application/javascript",
-    ".json": "application/json",
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg", 
-    ".gif": "image/gif",
-    ".svg": "image/svg+xml",
-    ".pdf": "application/pdf",
-    ".txt": "text/plain",
-    ".md": "text/markdown",
-    ".xml": "application/xml",
-    ".webp": "image/webp",
-    ".ico": "image/x-icon",
-    ".ttf": "font/ttf",
-    ".otf": "font/otf", 
-    ".woff": "font/woff",
-    ".woff2": "font/woff2",
-  };
+  // Special case for directories
+  if (path.extname(filePath) === "") {
+    return "directory";
+  }
   
-  return mimeTypes[ext] || "application/octet-stream";
+  // Use mime-types package for lookup
+  const mimeType = mime.lookup(filePath);
+  return mimeType ? mimeType.toString() : "application/octet-stream";
 }
 
 // Helper function to convert MIME type to bytes2
 export function mimeTypeToBytes2(mimeType: string): string {
   // Map MIME types to 2-byte identifiers using 1-letter codes
   const mimeTypeMap: Record<string, string> = {
-    'directory': '0x0001', // dir
     'text/html': '0x7468', // th
     'text/javascript': '0x616a', // aj (defaults to application/javascript)
     'text/css': '0x7463', // tc 
@@ -77,7 +62,6 @@ export function mimeTypeToBytes2(mimeType: string): string {
 export function bytes2ToMimeType(bytes2Value: string): string {
   // Map 2-byte identifiers back to MIME types
   const bytes2ToMimeMap: Record<string, string> = {
-    '0x0001': 'directory',                // dir
     '0x7468': 'text/html',                // th
     '0x616a': 'application/javascript',   // aj
     '0x7463': 'text/css',                 // tc
@@ -104,14 +88,14 @@ export function bytes2ToMimeType(bytes2Value: string): string {
 
 // Main upload function with enhanced error handling and validation
 export async function uploadFile(
-  wtppSite: Web3Site,
+  wttpSite: IBaseWTTPSite,
   sourcePath: string,
   destinationPath: string
 ) {
   console.log(`🚀 Starting upload: ${sourcePath} → ${destinationPath}`);
   
   // Parameter validation
-  if (!wtppSite) {
+  if (!wttpSite) {
     throw new Error("Web3Site contract instance is required");
   }
   if (!sourcePath || !destinationPath) {
@@ -138,32 +122,32 @@ export async function uploadFile(
   if (fileData.length === 0) {
     throw new Error("Cannot upload empty file");
   }
-  if (fileData.length > 100 * 1024 * 1024) { // 100MB limit
+  if (fileData.length > WTTP_FILE_WARN) { // 100MB limit
+    if (fileData.length > WTTP_FILE_LIMIT) {
+      throw new Error("❌  File size exceeds 400MB limit. Upload aborted.");
+    }
     console.warn("⚠️  Large file detected (>100MB). Upload may take significant time and gas.");
+  }
+
+  let resourceExists = false;
+  try{
+    let existingResource = await fetchResource(await wttpSite.getAddress(), destinationPath);
+    let existingData = existingResource.content;
+    if (existingData && Buffer.from(existingData).equals(fileData)) {
+      return existingResource;
+    }
+    resourceExists = true;
+  } catch (error) {
+    console.log(`No resource found at ${destinationPath}, uploading...`);
   }
   
   // Chunk the data
   const chunks = chunkData(fileData, CHUNK_SIZE);
   console.log(`Split into ${chunks.length} chunks of ${CHUNK_SIZE} bytes`);
   
-  // Get MIME type
-  const mimeType = getMimeType(sourcePath);
-  const mimeTypeBytes2 = mimeTypeToBytes2(mimeType);
-  
   // Prepare for upload
   const signer = await ethers.provider.getSigner();
   const signerAddress = await signer.getAddress();
-  
-  // Check if resource exists - updated to new structure without requestLine wrapper
-  const headRequest = {
-    path: destinationPath,
-    ifModifiedSince: 0,
-    ifNoneMatch: ethers.ZeroHash
-  };
-  
-  const headResponse = await wtppSite.HEAD(headRequest);
-  // Updated to use new response structure
-  const resourceExists = headResponse.status !== 404n;
   
   // Prepare data registrations
   const dataRegistrations = chunks.map((chunk, index) => ({
@@ -176,9 +160,9 @@ export async function uploadFile(
   let royalty = new Array(dataRegistrations.length).fill(0n);
   
   // Get the DPS and DPR contracts once for efficiency
-  const dpsAddress = await wtppSite.DPS();
+  const dpsAddress = await wttpSite.DPS();
   const dps = await ethers.getContractAt("DataPointStorage", dpsAddress);
-  const dprAddress = await wtppSite.DPR();
+  const dprAddress = await wttpSite.DPR();
   const dpr = await ethers.getContractAt("DataPointRegistry", dprAddress);
   
   let totalRoyalty = 0n;
@@ -205,35 +189,38 @@ export async function uploadFile(
   if (balance < totalRoyalty) {
     throw new Error(`Insufficient balance. Required: ${ethers.formatEther(totalRoyalty)} ETH, Available: ${ethers.formatEther(balance)} ETH`);
   }
-  
-  let startIndex = 0;
 
-  // Updated to use new metadata structure
-  const mimeTypeMatches = headResponse.metadata.properties.mimeType === mimeTypeBytes2;
-
-  // Upload the file
-  if (!resourceExists || !mimeTypeMatches) {
-    // Use PUT to create new resource - updated structure
-    console.log("Resource does not exist, using PUT to create...");
-    const putRequest = {
-      head: headRequest,
-      properties: {
-        mimeType: mimeTypeBytes2,
-        charset: "0x7556", // u8 = utf-8
-        encoding: "0x6964", // id = identity
-        language: "0x6575" // eu = english-US
-      },
-      data: [dataRegistrations[0]]
-    };
     
-    const tx = await wtppSite.PUT(putRequest, { value: royalty[0] });
-    await tx.wait();
-    console.log("File created successfully!");
-    startIndex = 1;
-  }
+  // Get MIME type
+  const mimeType = getMimeType(sourcePath).split("; charset=")[0];
+  // const charset = mimeType.split("; charset=")[1] || "utf-8";
+  const mimeTypeBytes2 = mimeTypeToBytes2(mimeType);
+
+  const headRequest = {
+    path: destinationPath,
+    ifModifiedSince: 0,
+    ifNoneMatch: ethers.ZeroHash
+  };
+
+  // Use PUT to create new resource/update existing resource
+  console.log(`${resourceExists ? "Updating" : "Creating"} resource at ${destinationPath}`);
+  const putRequest = {
+    head: headRequest,
+    properties: {
+      mimeType: mimeTypeBytes2,
+      charset: "0x7556", // u8 = utf-8
+      encoding: "0x6964", // id = identity
+      language: "0x6575" // eu = english-US
+    },
+    data: [dataRegistrations[0]]
+  };
+    
+  const tx = await wttpSite.PUT(putRequest, { value: royalty[0] });
+  await tx.wait();
+  console.log("File created successfully!");
 
   // Upload remaining chunks with progress reporting
-  for (let i = startIndex; i < dataRegistrations.length; i++) {
+  for (let i = 1; i < dataRegistrations.length; i++) {
     console.log(`📤 Uploading chunk ${i + 1}/${dataRegistrations.length} (${Math.round((i + 1) / dataRegistrations.length * 100)}%)`);
     
     try {
@@ -242,7 +229,7 @@ export async function uploadFile(
         data: [dataRegistrations[i]]
       };
     
-      const tx = await wtppSite.PATCH(patchRequest, { value: royalty[i] });
+      const tx = await wttpSite.PATCH(patchRequest, { value: royalty[i] });
       await tx.wait();
       console.log(`✅ Chunk ${i + 1} uploaded successfully (${ethers.formatEther(royalty[i])} ETH)`);
     } catch (error) {
@@ -251,27 +238,30 @@ export async function uploadFile(
     }
   }
 
-  
-  // Verify upload - updated structure
-  const locateRequest = {
-    head: {
-      path: destinationPath,
-      ifModifiedSince: 0,
-      ifNoneMatch: ethers.ZeroHash
-    },
-    rangeChunks: {
-      start: 0,
-      end: 0
-    }
-  };
+  let fetchResult;
+  try{
+    fetchResult = await fetchResource(
+      await wttpSite.getAddress(), 
+      destinationPath, 
+      {headRequest: true}
+    );
 
-  const response = await wtppSite.GET(locateRequest);
-  // console.log(response);
+  } catch (error) {
+    throw new Error(`Upload failed: ${error}`);
+  }
+
+  const fetchSize = fetchResult.response.head.metadata.size;
+
+  if (
+    fetchResult.response.head.status !== 200n && 
+    fetchSize === BigInt(fileData.length)
+  ) {
   
-  console.log(`Uploaded file has ${response.dataPoints.length} chunks`);
-  console.log(`File size: ${response.head.metadata.size} bytes`);
-  
-  return response;
+    console.log(`Uploaded file has ${dataRegistrations.length} chunks`);
+    console.log(`File size: ${fetchSize} bytes`);
+    
+  }
+  return fetchResult;
 }
 
 // Command-line interface

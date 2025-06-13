@@ -1,12 +1,12 @@
 import { ethers } from "hardhat";
 import fs from "fs";
 import path from "path";
-import { Web3Site } from "../../typechain-types";
+import { IBaseWTTPSite, READ_ONLY_PUBLIC_HEADER } from "@wttp/core";
 import { getMimeType, mimeTypeToBytes2 } from "./uploadFile";
 import { uploadFile } from "./uploadFile";
+import { DEFINERequestStruct, HEADRequestStruct } from "@wttp/core";
 
-// Constants
-const WTTP_VERSION = "WTTP/3.0";
+const MAX_CHUNK_SIZE = 32 * 1024;
 
 // Helper function to check if a path is a directory
 function isDirectory(sourcePath: string): boolean {
@@ -49,7 +49,7 @@ function getAllDirectories(dirPath: string, basePath: string, arrayOfDirs: strin
 }
 
 // Helper function to determine the index file for a directory
-function findIndexFile(dirPath: string): string | null {
+function findIndexFiles(dirPath: string): string[] {
   const files = fs.readdirSync(dirPath);
   
   // Priority order for index files
@@ -61,14 +61,20 @@ function findIndexFile(dirPath: string): string | null {
     "index.md",
     "index.txt"
   ];
+
+  let indexFiles = [];
   
   for (const indexFile of indexPriority) {
     if (files.includes(indexFile)) {
-      return indexFile;
+      indexFiles.push(indexFile);
     }
   }
+
+  if (indexFiles.length < 1) {
+    indexFiles.push("index.html");
+  }
   
-  return null;
+  return indexFiles;
 }
 
 // Helper function to create directory metadata
@@ -96,19 +102,13 @@ function createDirectoryMetadata(dirPath: string, basePath: string): Record<stri
 
 // Main upload directory function with enhanced error handling and validation
 export async function uploadDirectory(
-  wtppSite: Web3Site,
+  wttpSite: IBaseWTTPSite,
   sourcePath: string,
   destinationPath: string
 ) {
   console.log(`🚀 Starting directory upload: ${sourcePath} → ${destinationPath}`);
   
   // Parameter validation
-  if (!wtppSite) {
-    throw new Error("Web3Site contract instance is required");
-  }
-  if (!sourcePath || !destinationPath) {
-    throw new Error("Both source and destination paths are required");
-  }
   if (!fs.existsSync(sourcePath)) {
     throw new Error(`Source directory does not exist: ${sourcePath}`);
   }
@@ -121,353 +121,87 @@ export async function uploadDirectory(
     destinationPath += "/";
   }
   
-  // Find the index file for the directory
-  const indexFile = findIndexFile(sourcePath);
-  const indexLocation = indexFile ? `./${indexFile}` : "directory:"; // Default to index.html even if it doesn't exist
+  // Find the index files for the directory
+  const indexFiles = findIndexFiles(sourcePath);
+  let indexLocation = indexFiles.length > 1 ? "directory:" : `./${indexFiles[0]}`; // Default to index.html even if it doesn't exist
   
-  // Create directory metadata
-  const directoryMetadata = createDirectoryMetadata(sourcePath, sourcePath);
-  const directoryMetadataJson = JSON.stringify(directoryMetadata, null, 2);
-  
-  // Prepare for upload
-  const signer = await ethers.provider.getSigner();
-  const signerAddress = await signer.getAddress();
-  
-  // Get the DPS and DPR contracts for reuse
-  const dpsAddress = await wtppSite.DPS();
-  const dps = await ethers.getContractAt("DataPointStorage", dpsAddress);
-  const dprAddress = await wtppSite.DPR();
-  const dpr = await ethers.getContractAt("DataPointRegistry", dprAddress);
-  
-  // Check if resource exists - updated to new structure without requestLine wrapper
-  const headRequest = {
-    path: destinationPath,
-    ifModifiedSince: 0,
-    ifNoneMatch: ethers.ZeroHash
-  };
-  
-  const headResponse = await wtppSite.HEAD(headRequest);
-  // Updated to use new response structure
-  const resourceExists = headResponse.status !== 404n;
+  // single index file
+  let redirectCode = 301;
+  let tempMetadataPath: string | null = null;
+
+  if (indexLocation === "directory:") {
+    // Multiple choices
+    redirectCode = 300;
+
+    // First, we need to create a json object with the directory metadata
+    const directoryMetadata = createDirectoryMetadata(sourcePath, sourcePath);
+    const directoryMetadataJson = JSON.stringify(directoryMetadata, null, 2);
+
+    if (directoryMetadataJson.length < MAX_CHUNK_SIZE) {
+      // the directory listing can fit in the location header
+      indexLocation = directoryMetadataJson;
+    } else {
+      // Next, we need to create a temporary file with the directory metadata
+      tempMetadataPath = path.join(process.cwd(), "temp_directory_metadata.json");
+      fs.writeFileSync(tempMetadataPath, directoryMetadataJson);
+      // the directory listing is too large, so we need to upload it as a file
+      // can be done async in background
+      await uploadFile(wttpSite, tempMetadataPath, destinationPath);
+    }
+  }
   
   // Upload the directory metadata with redirect header
   console.log("Uploading directory metadata with redirect header...");
   
-  // First, we need to create a temporary file with the directory metadata
-  const tempMetadataPath = path.join(process.cwd(), "temp_directory_metadata.json");
-  fs.writeFileSync(tempMetadataPath, directoryMetadataJson);
-  
-  // Read the file data
-  const fileData = fs.readFileSync(tempMetadataPath);
-  
-  // Chunk the data
-  const CHUNK_SIZE = 32 * 1024; // 32KB chunks
-  const chunks: Buffer[] = [];
-  for (let i = 0; i < fileData.length; i += CHUNK_SIZE) {
-    chunks.push(fileData.slice(i, i + CHUNK_SIZE));
-  }
-  
-  // Prepare data registrations
-  const dataRegistrations = chunks.map((chunk, index) => ({
-    data: chunk,
-    chunkIndex: index,
-    publisher: signerAddress
-  }));
-  
-  // FIXED: Initialize royalty array with correct size to prevent index errors
-  let royalty = new Array(dataRegistrations.length).fill(0n);
-  
-  // Check royalties for the first chunk
-  const dataPointAddress = await dps.calculateAddress(dataRegistrations[0].data);
-  royalty[0] = await dpr.getDataPointRoyalty(dataPointAddress);
-  console.log(`💰 Directory metadata royalty: ${ethers.formatEther(royalty[0])} ETH`);
-  
-  // Check if the directory already exists
-  if (resourceExists) {
-    console.log(`Directory ${destinationPath} already exists, updating...`);
-    
-    // Use PATCH to update the existing directory
-    const patchRequest = {
-      head: headRequest,
-      data: [dataRegistrations[0]]
-    };
-    
-    const tx = await wtppSite.PATCH(patchRequest, { value: royalty[0] });
-    await tx.wait();
-    console.log("Directory updated successfully!");
-    
-    // Use DEFINE to ensure the directory has the correct headers - updated structure
-    const defineRequest = {
-      head: headRequest,
-      data: {
-        cache: {
-          immutableFlag: false,
-          preset: 0, // NONE preset for custom behavior
-          custom: "no-cache"
-        },
-        cors: {
-          methods: 65535, // All methods allowed (2^16 - 1)
-          origins: [],
-          preset: 1, // PUBLIC preset
-          custom: ""
-        },
-        redirect: {
-          code: 300, // Multiple Choices
-          location: indexLocation
-        }
-      }
-    };
-    
-    const defineTx = await wtppSite.DEFINE(defineRequest);
-    await defineTx.wait();
-    console.log("Directory headers updated successfully!");
-  } else {
-    // Use PUT to create the directory resource with custom headers - updated structure
-    console.log(`Creating directory ${destinationPath}...`);
+  let requestHead: HEADRequestStruct = {
+    path: destinationPath,
+    ifModifiedSince: 0,
+    ifNoneMatch: ethers.ZeroHash
+  };
 
-    const putRequest = {
-      head: headRequest,
-      properties: {
-        mimeType: "0x0001", // indicates directory
-        charset: "0x0000", // No metadata
-        encoding: "0x0000", // No metadata
-        language: "0x0000" // No metadata
-      },
-      data: [dataRegistrations[0]]
-    };
-    
-    const tx = await wtppSite.PUT(putRequest, { value: royalty[0] });
-    await tx.wait();
-    console.log("Directory created successfully!");
-    
-    // Use DEFINE to ensure the directory has the correct headers - updated structure
-    const defineRequest = {
-      head: headRequest,
-      data: {
-        cache: {
-          immutableFlag: false,
-          preset: 0, // NONE preset for custom behavior
-          custom: "no-cache"
-        },
-        cors: {
-          methods: 65535, // All methods allowed (2^16 - 1)  
-          origins: [],
-          preset: 1, // PUBLIC preset
-          custom: ""
-        },
-        redirect: {
-          code: 300, // Multiple Choices
-          location: indexLocation
-        }
+  const defineRequest: DEFINERequestStruct = {
+    head: requestHead,
+    data: {
+      ...READ_ONLY_PUBLIC_HEADER,
+      redirect: {
+        code: redirectCode,
+        location: indexLocation
       }
-    };
+    }
+  };
     
-    const defineTx = await wtppSite.DEFINE(defineRequest);
-    await defineTx.wait();
-    console.log("Directory headers set successfully!");
-  }
-  
-  // Upload remaining chunks if any
-  for (let i = 1; i < dataRegistrations.length; i++) {
-    // Check royalty for this chunk
-    const dataPointAddress = await dps.calculateAddress(dataRegistrations[i].data);
-    royalty[i] = await dpr.getDataPointRoyalty(dataPointAddress);
-    
-    // Use PATCH to update existing resource
-    console.log(`Uploading chunk ${i}...`);
-    const patchRequest = {
-      head: headRequest,
-      data: [dataRegistrations[i]]
-    };
-  
-    const tx = await wtppSite.PATCH(patchRequest, { value: royalty[i] });
-    await tx.wait();
-    console.log(`Chunk ${i} uploaded successfully!`);
-  }
+  const defineTx = await wttpSite.DEFINE(defineRequest);
+  await defineTx.wait();
+  console.log(`Directory ${destinationPath} created successfully!`);
   
   // Clean up the temporary file
-  fs.unlinkSync(tempMetadataPath);
+  if (tempMetadataPath) {
+    fs.unlinkSync(tempMetadataPath);
+  }
   
-  // Upload all files in the directory with progress reporting
-  const allFiles = getAllFiles(sourcePath);
-  console.log(`📁 Found ${allFiles.length} files to upload`);
-  
-  for (let i = 0; i < allFiles.length; i++) {
-    const file = allFiles[i];
-    const relativePath = path.relative(sourcePath, file);
-    const destinationFilePath = path.join(destinationPath, relativePath).replace(/\\/g, '/');
-    const progress = Math.round(((i + 1) / allFiles.length) * 100);
-    
-    console.log(`📤 Uploading file ${i + 1}/${allFiles.length} (${progress}%): ${relativePath}`);
+  // Process all items in the directory
+  const items = fs.readdirSync(sourcePath);
+
+  for (const item of items) {
+    const fullSourcePath = path.join(sourcePath, item);
+    const fullDestPath = path.join(destinationPath, item).replace(/\\/g, '/');
     
     try {
-      await uploadFile(wtppSite, file, destinationFilePath);
-      console.log(`✅ File uploaded successfully: ${relativePath}`);
+      if (isDirectory(fullSourcePath)) {
+        // Recursively handle subdirectories
+        await uploadDirectory(wttpSite, fullSourcePath, fullDestPath);
+      } else {
+        // Upload files
+        console.log(`📤 Uploading file: ${item}`);
+        await uploadFile(wttpSite, fullSourcePath, fullDestPath);
+        console.log(`✅ File uploaded successfully: ${item}`);
+      }
     } catch (error) {
-      console.error(`❌ Failed to upload file ${relativePath}:`, error);
-      throw new Error(`Failed to upload file ${relativePath}: ${error}`);
+      console.error(`❌ Failed to upload resource ${item}:`, error);
+      throw new Error(`Failed to upload resource ${item}: ${error}`);
     }
   }
-  
-  // Create all subdirectories
-  const allDirectories = getAllDirectories(sourcePath, sourcePath);
-  
-  for (const dir of allDirectories) {
-    const fullSourceDirPath = path.join(sourcePath, dir);
-    const destinationDirPath = path.join(destinationPath, dir).replace(/\\/g, '/') + '/';
     
-    console.log(`Creating directory ${destinationDirPath}...`);
-    
-    // Find the index file for the subdirectory
-    const subDirIndexFile = findIndexFile(fullSourceDirPath);
-    const subDirIndexLocation = subDirIndexFile ? `./${subDirIndexFile}` : "./index.html";
-    
-    // Create subdirectory metadata
-    const subDirMetadata = createDirectoryMetadata(fullSourceDirPath, sourcePath);
-    const subDirMetadataJson = JSON.stringify(subDirMetadata, null, 2);
-    
-    // Write subdirectory metadata to a temporary file
-    const tempSubDirMetadataPath = path.join(process.cwd(), `temp_${dir.replace(/[\/\\]/g, '_')}_metadata.json`);
-    fs.writeFileSync(tempSubDirMetadataPath, subDirMetadataJson);
-    
-    // Read the file data
-    const fileData = fs.readFileSync(tempSubDirMetadataPath);
-    
-    // Chunk the data
-    const CHUNK_SIZE = 32 * 1024; // 32KB chunks
-    const chunks: Buffer[] = [];
-    for (let i = 0; i < fileData.length; i += CHUNK_SIZE) {
-      chunks.push(fileData.slice(i, i + CHUNK_SIZE));
-    }
-    
-    // Prepare data registrations
-    const dataRegistrations = chunks.map((chunk, index) => ({
-      data: chunk,
-      chunkIndex: index,
-      publisher: signerAddress
-    }));
-    
-    let royalty = [0n];
-    
-    // Check royalties for the first chunk
-    const dataPointAddress = await dps.calculateAddress(dataRegistrations[0].data);
-    royalty[0] = await dpr.getDataPointRoyalty(dataPointAddress);
-    
-    // Create subdirectory head request - updated to new structure
-    const subDirHeadRequest = {
-      path: destinationDirPath,
-      ifModifiedSince: 0,
-      ifNoneMatch: ethers.ZeroHash
-    };
-    
-    // Check if subdirectory already exists - updated to new response structure
-    const subDirHeadResponse = await wtppSite.HEAD(subDirHeadRequest);
-    const subDirExists = subDirHeadResponse.status !== 404n;
-    
-    if (subDirExists) {
-      // Use PATCH to update the existing subdirectory
-      console.log(`Subdirectory ${destinationDirPath} already exists, updating...`);
-      const patchRequest = {
-        head: subDirHeadRequest,
-        data: [dataRegistrations[0]]
-      };
-      
-      const tx = await wtppSite.PATCH(patchRequest, { value: royalty[0] });
-      await tx.wait();
-      console.log(`Subdirectory ${destinationDirPath} updated successfully!`);
-      
-      // Use DEFINE to ensure the subdirectory has the correct headers - updated structure
-      const defineRequest = {
-        head: subDirHeadRequest,
-        data: {
-          cache: {
-            immutableFlag: false,
-            preset: 0, // NONE preset for custom behavior
-            custom: "no-cache"
-          },
-          cors: {
-            methods: 65535, // All methods allowed (2^16 - 1)
-            origins: [],
-            preset: 1, // PUBLIC preset
-            custom: ""
-          },
-          redirect: {
-            code: 300, // Multiple Choices
-            location: subDirIndexLocation
-          }
-        }
-      };
-      
-      const defineTx = await wtppSite.DEFINE(defineRequest);
-      await defineTx.wait();
-      console.log(`Subdirectory ${destinationDirPath} headers updated successfully!`);
-    } else {
-      // Use PUT to create the subdirectory resource with custom headers - updated structure
-      console.log(`Creating subdirectory ${destinationDirPath} with redirect header...`);
-      const putRequest = {
-        head: subDirHeadRequest,
-        properties: {
-          mimeType: "0x0001", // Directory mime type
-          charset: "0x0000", // No metadata
-          encoding: "0x0000", // No metadata
-          language: "0x0000" // No metadata
-        },
-        data: [dataRegistrations[0]]
-      };
-    
-      const tx = await wtppSite.PUT(putRequest, { value: royalty[0] });
-      await tx.wait();
-      console.log(`Subdirectory ${destinationDirPath} created successfully!`);
-      
-      // Use DEFINE to ensure the subdirectory has the correct headers - updated structure
-      const defineRequest = {
-        head: subDirHeadRequest,
-        data: {
-          cache: {
-            immutableFlag: false,
-            preset: 0, // NONE preset for custom behavior
-            custom: "no-cache"
-          },
-          cors: {
-            methods: 65535, // All methods allowed (2^16 - 1)
-            origins: [],
-            preset: 1, // PUBLIC preset
-            custom: ""
-          },
-          redirect: {
-            code: 300, // Multiple Choices
-            location: subDirIndexLocation
-          }
-        }
-      };
-      
-      const defineTx = await wtppSite.DEFINE(defineRequest);
-      await defineTx.wait();
-      console.log(`Subdirectory ${destinationDirPath} headers updated successfully!`);
-    }
-    
-    // Upload remaining chunks if any
-    for (let i = 1; i < dataRegistrations.length; i++) {
-      // Check royalty for this chunk
-      const dataPointAddress = await dps.calculateAddress(dataRegistrations[i].data);
-      royalty[i] = await dpr.getDataPointRoyalty(dataPointAddress);
-      
-      // Use PATCH to update existing resource
-      console.log(`Uploading chunk ${i} for subdirectory ${destinationDirPath}...`);
-      const patchRequest = {
-        head: subDirHeadRequest,
-        data: [dataRegistrations[i]]
-      };
-    
-      const tx = await wtppSite.PATCH(patchRequest, { value: royalty[i] });
-      await tx.wait();
-      console.log(`Chunk ${i} for subdirectory ${destinationDirPath} uploaded successfully!`);
-    }
-    
-    // Clean up the temporary file
-    fs.unlinkSync(tempSubDirMetadataPath);
-  }
-  
   console.log(`Directory ${sourcePath} uploaded successfully to ${destinationPath}`);
   return true;
 }
@@ -483,10 +217,10 @@ async function main() {
   const [siteAddress, sourcePath, destinationPath] = args;
   
   // Connect to the WTTP site
-  const wtppSite = await ethers.getContractAt("Web3Site", siteAddress);
+  const wttpSite = await ethers.getContractAt("Web3Site", siteAddress);
   
   // Upload the directory
-  await uploadDirectory(wtppSite, sourcePath, destinationPath);
+  await uploadDirectory(wttpSite, sourcePath, destinationPath);
 }
 
 // Only execute the script if it's being run directly
