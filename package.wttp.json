@@ -1,6 +1,6 @@
 {
   "name": "@wttp/site",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Web3 Transfer Protocol (WTTP) - Site Contracts and deployment tools",
   "main": "./dist/cjs/src/index.js",
   "module": "./dist/esm/src/index.js",
@@ -37,7 +37,7 @@
   "scripts": {
     "test": "npm run test:setup && npx hardhat test && npm run test:cleanup",
     "test:setup": "npx shx cp -r test-contracts/* contracts/",
-    "test:cleanup": "npx shx rm -rf contracts/test-*",
+    "test:cleanup": "npx shx rm -rf contracts/test",
     "interface:clean": "npx shx rm -rf contracts/interfaces",
     "compile": "npx hardhat compile",
     "build": "npm run compile && npm run clean && npm run build:types && npm run build:cjs && npm run build:esm",
@@ -75,6 +75,8 @@
   "homepage": "https://github.com/TechnicallyWeb3/wttp-site#readme",
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@types/mime-types": "^3.0.1",
+    "@wttp/site": "^0.0.2",
     "hardhat": "^2.24.2",
     "hardhat-change-network": "^0.0.7",
     "hardhat-contract-sizer": "^2.10.0",
@@ -83,6 +85,6 @@
     "shx": "^0.3.4"
   },
   "peerDependencies": {
-    "@wttp/core": "^0.2.8"
+    "@wttp/core": "^0.2.10"
   }
 }

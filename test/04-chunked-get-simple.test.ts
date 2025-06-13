@@ -64,10 +64,10 @@ describe("Simple Chunked GET Test", function () {
 
         it("should verify that scripts can use the new structure", async function () {
             // Import the fetchResource function to verify it compiles
-            const { fetchResourceFromSite } = await import("../src/scripts/fetchResource");
+            const { fetchResource } = await import("../src/scripts/fetchResource");
             
             // Just verify the function exists and can be imported
-            expect(fetchResourceFromSite).to.be.a('function');
+            expect(fetchResource).to.be.a('function');
             
             // console.log("✅ Scripts updated to use LOCATERequest structure");
         });
@@ -146,11 +146,11 @@ describe("Simple Chunked GET Test", function () {
 
         it("should verify that the contract can be used to fetch a resource", async function () {
             // Import the fetchResource function to verify it works with deployed contracts
-            const { fetchResourceFromSite } = await import("../src/scripts/fetchResource");
+            const { fetchResource } = await import("../src/scripts/fetchResource");
             
             // This test would require proper contract deployment and setup
             // For now, just verify the function exists and contracts are initialized
-            expect(fetchResourceFromSite).to.be.a('function');
+            expect(fetchResource).to.be.a('function');
             expect(site).to.not.be.undefined;
             expect(dps).to.not.be.undefined;
             

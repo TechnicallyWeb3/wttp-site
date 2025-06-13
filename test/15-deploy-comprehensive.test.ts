@@ -79,8 +79,7 @@ describe("15 - Deploy Infrastructure Comprehensive Tests", function () {
       it("should use test DPR for localhost network without --dpr parameter", async function () {
         const { stdout } = await execAsync("npx hardhat site:deploy --network localhost");
         
-        expect(stdout).to.include("Using test DPR for local network");
-        expect(stdout).to.include("0x0000000000000000000000000000000000000001");
+        expect(stdout).to.include("Using test DPR(temporary deployment):");
         expect(stdout).to.include("✅ Web3Site deployed successfully!");
       });
 
@@ -92,7 +91,7 @@ describe("15 - Deploy Infrastructure Comprehensive Tests", function () {
           // This test would work with actual supported networks
           // For localhost, we verify the auto-detection logic exists
           const { stdout } = await execAsync("npx hardhat site:deploy --network localhost");
-          expect(stdout).to.include("Using test DPR for local network");
+          expect(stdout).to.include("Using test DPR(temporary deployment):");
         } else {
           // Verify the function is available even if no chains supported
           expect(getSupportedChainIds).to.be.a('function');
@@ -113,7 +112,7 @@ describe("15 - Deploy Infrastructure Comprehensive Tests", function () {
         const { stdout } = await execAsync("npx hardhat site:deploy --network localhost");
         
         // Should still work with localhost fallback
-        expect(stdout).to.include("Using test DPR for local network");
+        expect(stdout).to.include("Using test DPR(temporary deployment):");
         expect(stdout).to.not.include("ChainId not configured");
       });
     });
@@ -421,7 +420,7 @@ describe("15 - Deploy Infrastructure Comprehensive Tests", function () {
         expect(stdout).to.include("🌐 Network: localhost");
         expect(stdout).to.include("👤 Deployer:");
         expect(stdout).to.include("👤 Owner:");
-        expect(stdout).to.include("📍 Using test DPR for local network:");
+        expect(stdout).to.include("📍 Using test DPR(temporary deployment):");
         expect(stdout).to.include("⚙️  Cache preset:");
         expect(stdout).to.include("💰 Deployer balance:");
         expect(stdout).to.include("💰 Owner balance:");

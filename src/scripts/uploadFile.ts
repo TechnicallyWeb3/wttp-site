@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 import fs from "fs";
 import path from "path";
-import { HEADResponseStructOutput, IBaseWTTPSite, LOCATERequestStruct, LOCATEResponseStruct, LOCATEResponseStructOutput } from "@wttp/core";
+import { IBaseWTTPSite, LOCATEResponseStruct } from "@wttp/core";
 import mime from "mime-types";
 import { fetchResource } from "./fetchResource";
 
