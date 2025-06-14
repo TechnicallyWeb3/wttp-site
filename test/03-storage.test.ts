@@ -375,7 +375,8 @@ describe("03 - WTTP Storage Security Audit", function () {
 
       await testWTTPStorage.testCreateResource("/test", testDataRegistration);
 
-      expect((await testWTTPStorage.testReadResource("/test", {start: 0, end: 0})).length).to.equal(1);
+      expect((await testWTTPStorage.testReadResource("/test", {start: 0, end: 0})).dataPoints.length).to.equal(1);
+      expect((await testWTTPStorage.testReadResource("/test", {start: 0, end: 0})).totalChunks).to.equal(1);
       const expectedSize = await dataPointStorage.dataPointSize(mockDataPointAddress);
       expect((await testWTTPStorage.testReadMetadata("/test")).size).to.equal(expectedSize);
     });
@@ -455,7 +456,8 @@ describe("03 - WTTP Storage Security Audit", function () {
 
       await testWTTPStorage.testUploadResource("/bulk", multipleRegistrations);
       
-      expect((await testWTTPStorage.testReadResource("/bulk", {start: 0, end: 0})).length).to.equal(3);
+      expect((await testWTTPStorage.testReadResource("/bulk", {start: 0, end: 0})).dataPoints.length).to.equal(3);
+      expect((await testWTTPStorage.testReadResource("/bulk", {start: 0, end: 0})).totalChunks).to.equal(3);
       const totalSize = (await testWTTPStorage.testReadMetadata("/bulk")).size;
       expect(totalSize).to.be.greaterThan(0);
     });
@@ -472,7 +474,8 @@ describe("03 - WTTP Storage Security Audit", function () {
       // Check resource was deleted
       const afterMetadata = await testWTTPStorage.testReadMetadata("/test");
       expect(afterMetadata.lastModified).to.equal(0);
-      expect((await testWTTPStorage.testReadResource("/test", {start: 0, end: 0})).length).to.equal(0);
+      expect((await testWTTPStorage.testReadResource("/test", {start: 0, end: 0})).dataPoints.length).to.equal(0);
+      expect((await testWTTPStorage.testReadResource("/test", {start: 0, end: 0})).totalChunks).to.equal(0);
       expect((await testWTTPStorage.testReadMetadata("/test")).size).to.equal(0);
     });
   });
@@ -569,7 +572,8 @@ describe("03 - WTTP Storage Security Audit", function () {
       }
       
       await testWTTPStorage.testUploadResource("/bulk", registrations, { value: totalRoyalty });
-      expect((await testWTTPStorage.testReadResource("/bulk", {start: 0, end: 0})).length).to.equal(3);
+      expect((await testWTTPStorage.testReadResource("/bulk", {start: 0, end: 0})).dataPoints.length).to.equal(3);
+      expect((await testWTTPStorage.testReadResource("/bulk", {start: 0, end: 0})).totalChunks).to.equal(3);
     });
   });
 

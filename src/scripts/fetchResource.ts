@@ -55,7 +55,7 @@ export async function fetchResource(
   // Get the site contract with error handling
   let siteContract: IBaseWTTPSite;
   try {
-    siteContract = await ethers.getContractAt("Web3Site", siteAddress) as IBaseWTTPSite;
+    siteContract = await ethers.getContractAt("Web3Site", siteAddress) as unknown as IBaseWTTPSite;
   } catch (error) {
     throw new Error(`Failed to connect to site contract at ${siteAddress}: ${error}`);
   }
@@ -103,7 +103,7 @@ export async function fetchResource(
       console.log(error.message);
     }
 
-    return { response: { head, dataPoints: [] }, content: undefined };
+    return { response: { head, resource: { dataPoints: [], totalChunks: 0 } }, content: undefined };
 
   } else {
     // For GET requests, use the site's GET method which returns LOCATEResponse
@@ -116,20 +116,23 @@ export async function fetchResource(
       console.log(error);
       locateResponse = {
         head: head,
-        dataPoints: []
+        resource: {
+          dataPoints: [],
+          totalChunks: 0
+        }
       };
     }
     
     // Updated to use new response structure without responseLine wrapper
     console.log(`Response status: ${locateResponse.head.status}`);
-    console.log(`Found ${locateResponse.dataPoints.length} data points`);
+    console.log(`Found ${locateResponse.resource.dataPoints.length} data points`);
 
     // If the response is successful and user wants data (no --datapoints flag), load the content
     let content: Uint8Array | undefined = undefined;
     if (!datapoints) {
       if ((locateResponse.head.status === 200n || locateResponse.head.status === 206n) 
-          && locateResponse.dataPoints.length > 0) {
-        const dataPointAddresses: string[] = locateResponse.dataPoints.map(dp => dp.toString());
+          && locateResponse.resource.dataPoints.length > 0) {
+        const dataPointAddresses: string[] = locateResponse.resource.dataPoints.map(dp => dp.toString());
         content = await readDataPointsContent(siteAddress, dataPointAddresses, chainId);
       }
     }
@@ -162,7 +165,7 @@ export async function readDataPointsContent(
   }
   
   // Get the site contract to access DPS
-  const siteContract = await ethers.getContractAt("Web3Site", siteAddress) as IBaseWTTPSite;
+  const siteContract = await ethers.getContractAt("Web3Site", siteAddress) as unknown as IBaseWTTPSite;
   const dpsAddress = await siteContract.DPS();
 
   console.log(`🔗 Loading DPS at address ${dpsAddress}...`);

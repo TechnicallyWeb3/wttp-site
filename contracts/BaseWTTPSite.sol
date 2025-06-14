@@ -181,7 +181,7 @@ abstract contract BaseWTTPSite is BaseWTTPStorage {
         _OPTIONS(_path, _method); // acts as a check
         ResourceMetadata memory _metadata = _readMetadata(_path);
         HeaderInfo memory _headerInfo = _readHeader(_path);
-        bytes32 _etag = calculateEtag(_metadata, _readResource(_path, Range(0, 0)));
+        bytes32 _etag = calculateEtag(_metadata, _readResource(_path, Range(0, 0)).dataPoints);
         uint16 _status = 500; // Internal Server Error
         if (
             _etag == headRequest.ifNoneMatch ||
@@ -222,20 +222,21 @@ abstract contract BaseWTTPSite is BaseWTTPStorage {
         Method _method
     ) internal view returns (LOCATEResponse memory getResponse) {
         string memory _path = getRequest.head.path;
-        getResponse.head = _HEAD(getRequest.head, _method); // includes error check
+        HEADResponse memory _head = _HEAD(getRequest.head, _method); // includes error check
         
         // design choice, do we allow content to be returned even if the resource is not found?
         // if so all we need to do is add this datapoint to the 500 code check. 
-        bytes32[] memory _dataPoints = _readResource(_path, getRequest.rangeChunks);
-        getResponse.dataPoints = _dataPoints;
+        ResourceResponse memory _resource = _readResource(_path, getRequest.rangeChunks);
+        getResponse.resource = _resource;
 
-        if (getResponse.head.status == 500) {
-            uint256 _resourceSize = _resourceDataPoints(_path);
-            getResponse.head.status = contentCode_(
-                _dataPoints.length, 
-                _resourceSize
+        if (_head.status == 500) {
+            _head.status = contentCode_(
+                _resource.dataPoints.length, 
+                _resource.totalChunks
             );
         }
+
+        getResponse.head = _head;
     }
 
     /// @notice Handles GET requests to retrieve resource content locations
@@ -267,13 +268,14 @@ abstract contract BaseWTTPSite is BaseWTTPStorage {
         }));
 
         ResourceMetadata memory _metadata = _readMetadata(_path);
+        bytes32[] memory _dataPoints = _readResource(_path, Range(0, 0)).dataPoints;
 
         defineResponse = DEFINEResponse({
             head: HEADResponse({
                 status: 200,
                 metadata: _metadata,
                 headerInfo: _readHeader(_path),
-                etag: calculateEtag(_metadata, _readResource(_path, Range(0, 0)))
+                etag: calculateEtag(_metadata, _dataPoints)
             }),
             headerAddress: _headerAddress
         });
@@ -343,7 +345,10 @@ abstract contract BaseWTTPSite is BaseWTTPStorage {
             headerInfo: _readHeader(_path),
             etag: calculateEtag(_metadata, _dataPoints)
         });
-        putResponse.dataPoints = _dataPoints;
+        putResponse.resource = ResourceResponse({
+            dataPoints: _dataPoints,
+            totalChunks: _data.length
+        });
 
         emit PUTSuccess(msg.sender, putResponse);
     }
@@ -366,7 +371,10 @@ abstract contract BaseWTTPSite is BaseWTTPStorage {
 
         patchResponse.head = _HEAD(patchRequest.head, Method.PATCH);
         patchResponse.head.status = contentCode_(_dataPoints.length, _resourceDataPoints(_path));
-        patchResponse.dataPoints = _dataPoints;
+        patchResponse.resource = ResourceResponse({
+            dataPoints: _dataPoints,
+            totalChunks: _resourceDataPoints(_path)
+        });
 
         emit PATCHSuccess(msg.sender, patchResponse);
     }

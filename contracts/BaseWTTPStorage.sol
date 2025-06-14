@@ -284,16 +284,20 @@ abstract contract BaseWTTPStorage is BaseWTTPPermissions {
     function _readResource(
         string memory _path,
         Range memory _range
-    ) internal virtual view returns (bytes32[] memory) { 
+    ) internal virtual view returns (ResourceResponse memory) { 
         // we should set a max range size to prevent DOS attacks
-        Range memory _normalizedRange = normalizeRange_(_range, _resourceDataPoints(_path));
+        uint256 _totalChunks = _resourceDataPoints(_path);
+        Range memory _normalizedRange = normalizeRange_(_range, _totalChunks);
         uint256 _resourceLength = uint256(_normalizedRange.end - _normalizedRange.start + 1);
-        uint256 _returnLength = _resourceLength > MAX_RANGE_SIZE ? MAX_RANGE_SIZE : _resourceLength;
+        uint256 _returnLength = _resourceLength > CHUNK_RESPONSE_LIMIT ? CHUNK_RESPONSE_LIMIT : _resourceLength;
         bytes32[] memory _dataPoints = new bytes32[](_returnLength);
         for (uint256 i = 0; i < _returnLength; i++) {
             _dataPoints[i] = resource[_path][uint256(_normalizedRange.start) + i];
         }
-        return _dataPoints;
+        return ResourceResponse({
+            dataPoints: _dataPoints,
+            totalChunks: _totalChunks
+        });
     }
 
     /// @notice Updates a specific chunk of a resource

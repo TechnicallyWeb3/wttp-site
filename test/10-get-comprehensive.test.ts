@@ -161,7 +161,7 @@ describe("🌐 GET Method - Comprehensive Testing", function () {
         rangeChunks: { start: 0, end: 0 }
       });
       expect(publicResponse.head.status).to.equal(200);
-      expect(publicResponse.dataPoints.length).to.be.greaterThan(0);
+      expect(publicResponse.resource.dataPoints.length).to.be.greaterThan(0);
 
       // Site admin should also be able to access GET
       const adminResponse = await testWTTPSite.connect(siteAdmin).GET({
@@ -376,8 +376,8 @@ describe("🌐 GET Method - Comprehensive Testing", function () {
       });
 
       expect(response.head.status).to.equal(200);
-      expect(response.dataPoints.length).to.equal(1);
-      expect(response.dataPoints[0]).to.not.equal(ethers.ZeroHash);
+      expect(response.resource.dataPoints.length).to.equal(1);
+      expect(response.resource.dataPoints[0]).to.not.equal(ethers.ZeroHash);
       expect(response.head.metadata.size).to.be.greaterThan(0);
       expect(response.head.etag).to.not.equal(ethers.ZeroHash);
     });
@@ -393,10 +393,10 @@ describe("🌐 GET Method - Comprehensive Testing", function () {
       });
 
       expect(response.head.status).to.equal(200);
-      expect(response.dataPoints.length).to.equal(3);
+      expect(response.resource.dataPoints.length).to.equal(3);
       
       // Verify each chunk has a valid data point
-      response.dataPoints.forEach(dataPoint => {
+      response.resource.dataPoints.forEach(dataPoint => {
         expect(dataPoint).to.not.equal(ethers.ZeroHash);
       });
     });
@@ -417,7 +417,7 @@ describe("🌐 GET Method - Comprehensive Testing", function () {
       });
 
       expect(response.head.status).to.equal(204); // No Content
-      expect(response.dataPoints.length).to.equal(0);
+      expect(response.resource.dataPoints.length).to.equal(0);
       expect(response.head.metadata.size).to.equal(0);
     });
 
@@ -637,7 +637,7 @@ describe("🌐 GET Method - Comprehensive Testing", function () {
         rangeChunks: { start: 0, end: 2 }
       });
       expect(allChunksResponse.head.status).to.equal(200);
-      expect(allChunksResponse.dataPoints.length).to.equal(3);
+      expect(allChunksResponse.resource.dataPoints.length).to.equal(3);
     });
 
     it("should handle large resource retrieval", async function () {
@@ -653,7 +653,7 @@ describe("🌐 GET Method - Comprehensive Testing", function () {
       });
 
       expect(response.head.status).to.equal(200);
-      expect(response.dataPoints.length).to.equal(5);
+      expect(response.resource.dataPoints.length).to.equal(5);
       expect(response.head.metadata.size).to.be.greaterThan(0);
     });
 

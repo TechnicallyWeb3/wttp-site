@@ -210,7 +210,7 @@ describe("05a - WTTP Site Systematic Testing", function () {
         rangeChunks: { start: 0, end: 0 }
       });
       expect(getResponse.head.status).to.equal(200);
-      expect(getResponse.dataPoints[0]).not.to.equal(ethers.ZeroHash);
+      expect(getResponse.resource.dataPoints[0]).not.to.equal(ethers.ZeroHash);
 
     });
 
@@ -323,8 +323,8 @@ describe("05a - WTTP Site Systematic Testing", function () {
       });
       
       expect(getResponse.head.status).to.equal(200);
-      expect(getResponse.dataPoints.length).to.equal(1);
-      expect(getResponse.dataPoints[0]).to.not.equal(ethers.ZeroHash);
+      expect(getResponse.resource.dataPoints.length).to.equal(1);
+      expect(getResponse.resource.dataPoints[0]).to.not.equal(ethers.ZeroHash);
     });
 
   });

@@ -542,7 +542,7 @@ describe("06 - PUT Method Comprehensive Testing", function () {
       });
       
       expect(getResponse.head.status).to.equal(200);
-      expect(getResponse.dataPoints.length).to.equal(1);
+      expect(getResponse.resource.dataPoints.length).to.equal(1);
     });
 
     it("should handle medium data (~10KB)", async function () {
@@ -588,7 +588,7 @@ describe("06 - PUT Method Comprehensive Testing", function () {
         rangeChunks: { start: 0, end: 1 }
       });
       
-      expect(getResponse.dataPoints.length).to.equal(2);
+      expect(getResponse.resource.dataPoints.length).to.equal(2);
       expect(getResponse.head.metadata.size).to.equal(16000); // 8000 + 8000
     });
 
@@ -605,7 +605,7 @@ describe("06 - PUT Method Comprehensive Testing", function () {
       // Calculate expected address
       const expectedAddress = await dataPointStorage.calculateAddress(ethers.toUtf8Bytes(testData));
       
-      expect(response.dataPoints[0]).to.equal(expectedAddress);
+      expect(response.resource.dataPoints[0]).to.equal(expectedAddress);
     });
   });
 
@@ -668,7 +668,7 @@ describe("06 - PUT Method Comprehensive Testing", function () {
         head: { path: testPath, ifModifiedSince: 0, ifNoneMatch: ethers.ZeroHash },
         rangeChunks: { start: 0, end: 0 }
       });
-      expect(getResponse1.dataPoints[0]).to.equal(expectedDataPoint);
+      expect(getResponse1.resource.dataPoints[0]).to.equal(expectedDataPoint);
       const version1 = getResponse1.head.metadata.version;
       
       // Calculate royalty for existing datapoint
@@ -686,7 +686,7 @@ describe("06 - PUT Method Comprehensive Testing", function () {
         head: { path: testPath, ifModifiedSince: 0, ifNoneMatch: ethers.ZeroHash },
         rangeChunks: { start: 0, end: 0 }
       });
-      expect(getResponse2.dataPoints[0]).to.equal(expectedDataPoint); // Same data
+      expect(getResponse2.resource.dataPoints[0]).to.equal(expectedDataPoint); // Same data
       expect(getResponse2.head.metadata.version).to.be.greaterThan(version1); // Version incremented
     });
 
@@ -700,7 +700,7 @@ describe("06 - PUT Method Comprehensive Testing", function () {
       });
       
       expect(response.head.status).to.equal(204); // No Content
-      expect(response.dataPoints.length).to.equal(0);
+      expect(response.resource.dataPoints.length).to.equal(0);
     });
 
     it("should require royalty payments for duplicate data", async function () {
@@ -747,8 +747,8 @@ describe("06 - PUT Method Comprehensive Testing", function () {
         rangeChunks: { start: 0, end: 0 }
       });
       
-      expect(getResponse1.dataPoints[0]).to.equal(getResponse2.dataPoints[0]);
-      expect(getResponse1.dataPoints[0]).to.equal(dataPointAddress);
+      expect(getResponse1.resource.dataPoints[0]).to.equal(getResponse2.resource.dataPoints[0]);
+      expect(getResponse1.resource.dataPoints[0]).to.equal(dataPointAddress);
     });
   });
 }); 

@@ -84,6 +84,6 @@
     "shx": "^0.3.4"
   },
   "peerDependencies": {
-    "@wttp/core": "^0.3.0"
+    "@wttp/core": "^0.4.0"
   }
 }

@@ -60,7 +60,7 @@ contract TestWTTPStorage is BaseWTTPStorage {
         return _createResource(path, resource);
     }
 
-    function testReadResource(string memory path, Range memory range) public view returns (bytes32[] memory) {
+    function testReadResource(string memory path, Range memory range) public view returns (ResourceResponse memory) {
         return _readResource(path, range);
     }
 

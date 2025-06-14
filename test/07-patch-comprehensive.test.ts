@@ -15,6 +15,7 @@ import {
   PUTRequestStruct,
   HeaderInfoStruct
 } from "../typechain-types/contracts/test/TestWTTPSite";
+import { LOCATEResponseStruct } from "@wttp/core";
 
 describe("07 - PATCH Method Comprehensive Testing", function () {
   let testWTTPSite: TestWTTPSite;
@@ -306,7 +307,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
       });
       
       expect(getResponse.head.status).to.equal(200);
-      expect(getResponse.dataPoints.length).to.equal(4);
+      expect(getResponse.resource.dataPoints.length).to.equal(4);
       
       // Verify metadata updated correctly
       const headResponse = await testWTTPSite.connect(user1).HEAD({
@@ -334,7 +335,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
       });
       
       expect(response.head.status).to.equal(200);
-      expect(response.dataPoints.length).to.equal(3);
+      expect(response.resource.dataPoints.length).to.equal(3);
     });
 
     it("should validate chunk ordering and integrity", async function () {
@@ -354,7 +355,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
       });
       
       expect(chunk1Response.head.status).to.equal(206); // Partial content
-      expect(chunk1Response.dataPoints.length).to.equal(1);
+      expect(chunk1Response.resource.dataPoints.length).to.equal(1);
     });
 
     it("should handle chunk replacement at existing indexes", async function () {
@@ -409,7 +410,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
       });
       
       expect(response.head.status).to.equal(200);
-      expect(response.dataPoints.length).to.equal(3);
+      expect(response.resource.dataPoints.length).to.equal(3);
     });
 
     it("should handle non-sequential chunk updates", async function () {
@@ -429,7 +430,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
       });
       
       expect(response.head.status).to.equal(200);
-      expect(response.dataPoints.length).to.equal(2);
+      expect(response.resource.dataPoints.length).to.equal(2);
     });
 
     it("should return proper status codes for multi-chunk operations", async function () {
@@ -474,7 +475,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
       });
       
       expect(response.head.status).to.equal(200);
-      expect(response.dataPoints.length).to.equal(6);
+      expect(response.resource.dataPoints.length).to.equal(6);
       expect(response.head.metadata.version).to.be.greaterThan(6); // 1 PUT + 5 PATCHes + DEFINE operations
     });
   });
@@ -522,7 +523,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
         rangeChunks: { start: 0, end: 2 }
       });
       
-      expect(finalResponse.dataPoints.length).to.equal(3);
+      expect(finalResponse.resource.dataPoints.length).to.equal(3);
       expect(finalResponse.head.status).to.equal(200);
     });
 
@@ -555,7 +556,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
           rangeChunks: { start: 0, end: i }
         });
         
-        expect(response.dataPoints.length).to.equal(i + 1);
+        expect(response.resource.dataPoints.length).to.equal(i + 1);
       }
     });
 
@@ -616,7 +617,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
       
       // After normalization to (0, 0), this is treated as full range request
       expect(Number(singleChunkResponse.head.status)).to.equal(200); // Full range after normalization
-      expect(singleChunkResponse.dataPoints.length).to.equal(2); // Full resource (both chunks)
+      expect(singleChunkResponse.resource.dataPoints.length).to.equal(2); // Full resource (both chunks)
       
       // Verify full resource still works with (0, 1) 
       const fullResponse = await testWTTPSite.connect(user1).GET({
@@ -625,7 +626,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
       });
       
       expect(Number(fullResponse.head.status)).to.equal(200); // Full resource
-      expect(fullResponse.dataPoints.length).to.equal(2); // Both chunks present
+      expect(fullResponse.resource.dataPoints.length).to.equal(2); // Both chunks present
     });
 
     it("should validate range normalization API behavior", async function () {
@@ -644,7 +645,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
       
       // (-1, 0) gets normalized to (0, 0) which is treated as full range
       expect(Number(normalizedRequest.head.status)).to.equal(200); // Full resource after normalization
-      expect(normalizedRequest.dataPoints.length).to.equal(3); // All chunks
+      expect(normalizedRequest.resource.dataPoints.length).to.equal(3); // All chunks
       
       // Test (0, 0) as "full resource" request when user doesn't know length
       const unknownLength = await testWTTPSite.connect(user1).GET({
@@ -653,7 +654,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
       });
       
       expect(Number(unknownLength.head.status)).to.equal(200); // Full resource
-      expect(unknownLength.dataPoints.length).to.equal(3); // All chunks
+      expect(unknownLength.resource.dataPoints.length).to.equal(3); // All chunks
       
       // Test (-1, 1) - only (-1, 0) gets normalized, so this stays as (-1, 1) 
       const specificRange = await testWTTPSite.connect(user1).GET({
@@ -662,7 +663,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
       });
       
       expect(Number(specificRange.head.status)).to.equal(206); // Partial content
-      expect(specificRange.dataPoints.length).to.equal(1); // Just chunk 1 (range starts at -1)
+      expect(specificRange.resource.dataPoints.length).to.equal(1); // Just chunk 1 (range starts at -1)
     });
   });
 
@@ -742,7 +743,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
       });
       
       expect(response.head.status).to.equal(206); // Partial Content
-      expect(response.dataPoints.length).to.equal(2);
+      expect(response.resource.dataPoints.length).to.equal(2);
     });
   });
 
@@ -773,7 +774,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
         rangeChunks: { start: 0, end: 1 }
       });
       
-      expect(getResponse.dataPoints.length).to.equal(2);
+      expect(getResponse.resource.dataPoints.length).to.equal(2);
     });
 
     it("should handle duplicate data with proper royalty payments", async function () {
@@ -857,7 +858,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
         rangeChunks: { start: 0, end: 3 }
       });
       
-      expect(finalResponse.dataPoints.length).to.equal(4); // Base + 3 patches
+      expect(finalResponse.resource.dataPoints.length).to.equal(4); // Base + 3 patches
     });
   });
 
@@ -920,10 +921,10 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
       });
       
       expect(response.head.status).to.equal(200);
-      expect(response.dataPoints.length).to.equal(3);
+      expect(response.resource.dataPoints.length).to.equal(3);
       
       // All chunks should be unique addresses
-      const uniqueAddresses = new Set(response.dataPoints);
+      const uniqueAddresses = new Set(response.resource.dataPoints);
       expect(uniqueAddresses.size).to.equal(3);
     });
 
@@ -1006,7 +1007,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
         rangeChunks: { start: 0, end: 0 }
       });
       
-      expect(getResponse.dataPoints.length).to.equal(1); // Still just the base chunk
+      expect(getResponse.resource.dataPoints.length).to.equal(1); // Still just the base chunk
     });
 
     it("should prefer custom errors over generic reverts", async function () {
