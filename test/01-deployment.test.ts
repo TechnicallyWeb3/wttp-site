@@ -10,6 +10,7 @@ import {
   type HeaderInfoStruct,
   type IDataPointStorage,
   type IDataPointRegistry,
+  type IBaseWTTPSite
 } from "@wttp/core";
 
 import { 
@@ -20,10 +21,11 @@ import {
   ORIGINS_PRESETS
 } from "@wttp/core";
 
-import { TestWTTPPermissions } from "../typechain-types/contracts/test/TestWTTPPermissions";
-import { TestWTTPStorage } from "../typechain-types/contracts/test/TestWTTPStorage";
-import { TestWTTPSite } from "../typechain-types/contracts/test/TestWTTPSite";
-import { IBaseWTTPSite } from "@wttp/core";
+import { 
+  TestWTTPPermissions,
+  TestWTTPStorage,
+  TestWTTPSite
+} from "../typechain-types";
 
 import { loadEspContracts } from "./helpers/espHelpers";
 import { BaseContract } from "ethers";

@@ -3,24 +3,14 @@ import { ethers } from "hardhat";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import {
   TestWTTPSite,
-  DataPointStorage,
-  DataPointRegistry,
   TestWTTPPermissions
 } from "../typechain-types";
-import {
-  DataRegistrationStruct,
-  HEADRequestStruct,
-  LOCATERequestStruct,
-  PATCHRequestStruct,
-  PUTRequestStruct,
-  HeaderInfoStruct
-} from "../typechain-types/contracts/test/TestWTTPSite";
-import { LOCATEResponseStruct } from "@wttp/core";
+import { HeaderInfoStruct, IDataPointStorage, IDataPointRegistry } from "@wttp/core";
 
 describe("07 - PATCH Method Comprehensive Testing", function () {
   let testWTTPSite: TestWTTPSite;
-  let dataPointStorage: DataPointStorage;
-  let dataPointRegistry: DataPointRegistry;
+  let dataPointStorage: IDataPointStorage;
+  let dataPointRegistry: IDataPointRegistry;
   let testWTTPPermissions: TestWTTPPermissions;
 
   let owner: HardhatEthersSigner;
@@ -46,7 +36,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
 
     // Deploy DataPointStorage
     const DataPointStorageFactory = await ethers.getContractFactory("DataPointStorage");
-    dataPointStorage = await DataPointStorageFactory.deploy() as unknown as DataPointStorage;
+    dataPointStorage = await DataPointStorageFactory.deploy() as unknown as IDataPointStorage;
     await dataPointStorage.waitForDeployment();
 
     // Deploy DataPointRegistry
@@ -55,7 +45,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
       owner.address,
       await dataPointStorage.getAddress(),
       ethers.parseEther("0.0001") // Default royalty rate
-    ) as unknown as DataPointRegistry;
+    ) as unknown as IDataPointRegistry;
     await dataPointRegistry.waitForDeployment();
 
     // Setup roles
@@ -446,7 +436,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
       
       // Wait for transaction and check events
       const receipt = await patchResponse.wait();
-      const patchEvent = receipt?.logs.find(log => {
+      const patchEvent = receipt?.logs.find((log: any) => {
         try {
           return testWTTPSite.interface.parseLog(log)?.name === "PATCHSuccess";
         } catch {

@@ -2,10 +2,19 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { loadEspContracts, createUniqueData } from "./helpers/espHelpers";
-import { TestWTTPStorage } from "../typechain-types/contracts/test/TestWTTPStorage";
-import { IDataPointRegistry, IDataPointStorage, DataRegistrationStruct } from "@wttp/core";
-import { DEFAULT_ADMIN_ROLE, PUBLIC_ROLE, BLACKLIST_ROLE, PUBLIC_HEADER, Method } from "@wttp/core";
-import { ResourceMetadataStruct } from "../typechain-types/contracts/test/TestWTTPStorage";
+import { TestWTTPStorage } from "../typechain-types";
+import { 
+  IDataPointRegistry, 
+  IDataPointStorage, 
+  DataRegistrationStruct, 
+  ResourceMetadataStruct 
+} from "@wttp/core";
+import { 
+  DEFAULT_ADMIN_ROLE, 
+  PUBLIC_ROLE, 
+  BLACKLIST_ROLE, 
+  PUBLIC_HEADER,
+} from "@wttp/core";
 
 describe("03 - WTTP Storage Security Audit", function () {
   let testWTTPStorage: TestWTTPStorage;

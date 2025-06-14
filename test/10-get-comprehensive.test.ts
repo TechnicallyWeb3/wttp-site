@@ -396,7 +396,7 @@ describe("🌐 GET Method - Comprehensive Testing", function () {
       expect(response.resource.dataPoints.length).to.equal(3);
       
       // Verify each chunk has a valid data point
-      response.resource.dataPoints.forEach(dataPoint => {
+      response.resource.dataPoints.forEach((dataPoint: string) => {
         expect(dataPoint).to.not.equal(ethers.ZeroHash);
       });
     });

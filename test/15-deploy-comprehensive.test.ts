@@ -11,17 +11,11 @@ import { loadEspContracts, createUniqueData } from "./helpers/espHelpers";
 import { 
   IDataPointRegistry, 
   IDataPointStorage,
-  addLocalhostDeployment,
-  removeLocalhostDeployment,
   getSupportedChainIds,
-  getContractAddress
 } from "@tw3/esp";
 
 // WTTP Core types
-import { HeaderInfoStruct } from "@wttp/core";
-
-// Contract types
-import { Web3Site, IBaseWTTPSite } from "../typechain-types";
+import { IBaseWTTPSite } from "@wttp/core";
 
 const execAsync = promisify(exec);
 

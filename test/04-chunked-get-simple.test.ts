@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import fs from "fs";
 import { exec } from "child_process";
-import { TestWTTPSite } from "../typechain-types/contracts/test/TestWTTPSite";
+import { TestWTTPSite } from "../typechain-types";
 
 describe("Simple Chunked GET Test", function () {
     describe("Contract Interface", function () {

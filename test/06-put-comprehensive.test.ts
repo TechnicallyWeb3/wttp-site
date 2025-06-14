@@ -2,8 +2,8 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { loadEspContracts, createUniqueData } from "./helpers/espHelpers";
-import { TestWTTPSite } from "../typechain-types/contracts/test/TestWTTPSite";
-import { ALL_METHODS_BITMASK, IDataPointRegistry, IDataPointStorage } from "@wttp/core";
+import { TestWTTPSite } from "../typechain-types";
+import { IDataPointRegistry, IDataPointStorage } from "@wttp/core";
 
 describe("06 - PUT Method Comprehensive Testing", function () {
   let testWTTPSite: TestWTTPSite;

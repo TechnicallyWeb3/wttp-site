@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { loadEspContracts, createUniqueData } from "./helpers/espHelpers";
-import { TestWTTPSite } from "../typechain-types/contracts/test/TestWTTPSite";
+import { TestWTTPSite } from "../typechain-types";
 import { ALL_METHODS_BITMASK, IDataPointRegistry, IDataPointStorage } from "@wttp/core";
 
 describe("05a - WTTP Site Systematic Testing", function () {
