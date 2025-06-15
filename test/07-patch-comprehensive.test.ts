@@ -606,8 +606,8 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
       });
       
       // After normalization to (0, 0), this is treated as full range request
-      expect(Number(singleChunkResponse.head.status)).to.equal(200); // Full range after normalization
-      expect(singleChunkResponse.resource.dataPoints.length).to.equal(2); // Full resource (both chunks)
+      expect(Number(singleChunkResponse.head.status)).to.equal(206); // single chunk
+      expect(singleChunkResponse.resource.dataPoints.length).to.equal(1); // Full resource (both chunks)
       
       // Verify full resource still works with (0, 1) 
       const fullResponse = await testWTTPSite.connect(user1).GET({
@@ -634,8 +634,8 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
       });
       
       // (-1, 0) gets normalized to (0, 0) which is treated as full range
-      expect(Number(normalizedRequest.head.status)).to.equal(200); // Full resource after normalization
-      expect(normalizedRequest.resource.dataPoints.length).to.equal(3); // All chunks
+      expect(Number(normalizedRequest.head.status)).to.equal(206); // Partial content
+      expect(normalizedRequest.resource.dataPoints.length).to.equal(1); // Just chunk 0
       
       // Test (0, 0) as "full resource" request when user doesn't know length
       const unknownLength = await testWTTPSite.connect(user1).GET({
@@ -653,7 +653,7 @@ describe("07 - PATCH Method Comprehensive Testing", function () {
       });
       
       expect(Number(specificRange.head.status)).to.equal(206); // Partial content
-      expect(specificRange.resource.dataPoints.length).to.equal(1); // Just chunk 1 (range starts at -1)
+      expect(specificRange.resource.dataPoints.length).to.equal(1); // Just chunk 1
     });
   });
 
