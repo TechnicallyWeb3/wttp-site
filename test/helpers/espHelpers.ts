@@ -135,6 +135,12 @@ export function createUniqueData(baseString: string = "Test Data"): string {
       // load the contracts using @tw3/esp loadContract function
       dps = loadContract(currentChainId, "dps") as IDataPointStorage;
       dpr = loadContract(currentChainId, "dpr") as IDataPointRegistry;
+      try {
+        await dps.VERSION();
+      } catch (error) {
+        removeLocalhostDeployment(currentChainId);
+        throw new Error("Failed to load ESP contracts");
+      }
     } else {
       // copy the contracts to local storage from @tw3/esp/contracts/interfaces to ../contracts/interfaces
       await copyEspContracts(force);

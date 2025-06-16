@@ -1,6 +1,6 @@
 {
   "name": "wttp-site",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Web3 Transfer Protocol (WTTP) - Site Contracts and deployment tools",
   "main": "./dist/cjs/src/index.js",
   "module": "./dist/esm/src/index.js",
@@ -84,6 +84,6 @@
     "shx": "^0.3.4"
   },
   "peerDependencies": {
-    "@wttp/core": "^0.4.0"
+    "@wttp/core": "^0.4.2"
   }
 }

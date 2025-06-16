@@ -360,7 +360,7 @@ type ESPConstructorArgs = {
 }
 
 async function deployOrLoadTestEsp(hre: HardhatRuntimeEnvironment, deploymentArgs: ESPConstructorArgs = {}, signer?: HardhatEthersSigner) {
-  const { addLocalhostDeployment, getContractAddress, getSupportedChainIds } = await import("@tw3/esp");
+  const { getContractAddress, getSupportedChainIds } = await import("@tw3/esp");
   if (!hre.network.config.chainId) {
     throw new Error("ChainId not configured");
   }
