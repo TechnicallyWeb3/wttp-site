@@ -161,9 +161,9 @@ export async function uploadFile(
   
   // Get the DPS and DPR contracts once for efficiency
   const dpsAddress = await wttpSite.DPS();
-  const dps = await ethers.getContractAt("DataPointStorage", dpsAddress);
+  const dps = await ethers.getContractAt("IDataPointStorage", dpsAddress);
   const dprAddress = await wttpSite.DPR();
-  const dpr = await ethers.getContractAt("DataPointRegistry", dprAddress);
+  const dpr = await ethers.getContractAt("IDataPointRegistry", dprAddress);
   
   let totalRoyalty = 0n;
   

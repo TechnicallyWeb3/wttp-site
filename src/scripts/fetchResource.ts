@@ -171,7 +171,7 @@ export async function readDataPointsContent(
   console.log(`🔗 Loading DPS at address ${dpsAddress}...`);
   
   // Get the DPS contract
-  const dpsContract = await ethers.getContractAt("DataPointStorage", dpsAddress);
+  const dpsContract = await ethers.getContractAt("IDataPointStorage", dpsAddress);
   
   // Read all datapoints and combine their content with progress reporting
   const contents: Uint8Array[] = [];

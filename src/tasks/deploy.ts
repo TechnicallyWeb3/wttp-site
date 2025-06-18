@@ -3,6 +3,7 @@ import { ALL_METHODS_BITMASK, ORIGINS_PUBLIC, PUBLIC_HEADER } from "@wttp/core";
 import { task, types } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import "@nomicfoundation/hardhat-ethers";
 
 task("site:deploy", "Deploy a single Web3Site contract with funding checks")
   .addOptionalParam(
@@ -147,7 +148,7 @@ task("site:deploy", "Deploy a single Web3Site contract with funding checks")
 
       const feeData = await hre.ethers.provider.getFeeData();
       const gasPrice = feeData.gasPrice || hre.ethers.parseUnits("20", "gwei");
-      const estimatedCost = gasEstimate * gasPrice * BigInt(110) / BigInt(100); // 10% buffer
+      const estimatedCost = BigInt(gasEstimate) * gasPrice * BigInt(110) / BigInt(100); // 10% buffer
 
       console.log(`⛽ Estimated cost: ${hre.ethers.formatEther(estimatedCost)} ETH (${gasEstimate.toString()} gas)`);
 
@@ -169,7 +170,7 @@ task("site:deploy", "Deploy a single Web3Site contract with funding checks")
         const fundingTx = await signers[0].sendTransaction({
           to: deployer.address,
           value: fundingNeeded,
-          gasLimit: 21000n
+          gasLimit: BigInt(21000)
         });
         await fundingTx.wait();
         console.log(`✅ Funded deployer (tx: ${fundingTx.hash})`);
@@ -313,28 +314,117 @@ task("site:verify", "Verify deployed Web3Site contract")
   .addParam("address", "Web3Site contract address", undefined, types.string)
   .addParam("dpr", "DPR address used in constructor", undefined, types.string)
   .addParam("owner", "Owner address used in constructor", undefined, types.string)
-  .addOptionalParam("maxAge", "Cache max age used in constructor", "3600", types.int)
+  .addOptionalParam(
+    "cachePreset",
+    "Cache preset (0=NONE, 1=NO_CACHE, 2=DEFAULT, 3=SHORT, 4=MEDIUM, 5=LONG, 6=PERMANENT) or (none|short|medium|long|aggressive|permanent)",
+    "3",
+    types.string
+  )
+  .addOptionalParam(
+    "headerPreset",
+    "Header preset (basic|development|production)",
+    undefined,
+    types.string
+  )
+  .addOptionalParam(
+    "corsPreset", 
+    "CORS preset (permissive|strict|basic)",
+    undefined,
+    types.string
+  )
+  .addOptionalParam("confirmations", "Number of confirmations to wait before verifying (default: 5)", "5", types.string)
+  .addFlag("skipWait", "Skip waiting for confirmations before verification")
   .setAction(async (taskArgs, hre) => {
-    const { address, dpr, owner, maxAge } = taskArgs;
+    const { address, dpr, owner, cachePreset, headerPreset, corsPreset, confirmations, skipWait } = taskArgs;
 
     console.log(`🔍 Verifying Web3Site on ${hre.network.name}...`);
     console.log(`📍 Contract: ${address}`);
+    console.log(`👤 Owner: ${owner}`);
+    console.log(`📍 DPR: ${dpr}`);
 
-    const defaultHeader = {
-      methods: 511,
-      cache: {
-        maxAge: parseInt(maxAge),
-        noStore: false,
-        noCache: false,
-        immutableFlag: false,
-        publicFlag: true
-      },
-      redirect: {
-        code: 0,
-        location: ""
-      },
-      resourceAdmin: hre.ethers.ZeroHash
+    // Create header with same logic as deployment task
+    const defaultHeader = { ...PUBLIC_HEADER };
+
+    // Named cache preset support
+    const cachePresets: { [key: string]: number } = { 
+      none: 0, 
+      short: 2, 
+      medium: 3, 
+      long: 4, 
+      aggressive: 5, 
+      permanent: 6 
     };
+
+    // Convert string cache presets to numeric values
+    const cacheValue = typeof cachePreset === 'string' 
+      ? (cachePresets[cachePreset] !== undefined ? cachePresets[cachePreset] : parseInt(cachePreset)) 
+      : cachePreset;
+
+    console.log(`⚙️  Cache preset resolved: ${cacheValue} (from '${cachePreset}')`);
+
+    // Apply header presets based on Alex's specifications
+    const headerPresets: { [key: string]: { cache: number; cors: number } } = {
+      basic: { cache: 3, cors: 1 },
+      development: { cache: 1, cors: 2 }, 
+      production: { cache: 5, cors: 0 }
+    };
+
+    const corsPresets: { [key: string]: number } = {
+      permissive: 2,
+      strict: 0,
+      basic: 1
+    };
+
+    // Apply header preset if specified
+    if (headerPreset && headerPresets[headerPreset]) {
+      const preset = headerPresets[headerPreset];
+      defaultHeader.cache.preset = preset.cache;
+      defaultHeader.cors.preset = preset.cors;
+      console.log(`🎛️  Applied header preset '${headerPreset}': cache=${preset.cache}, cors=${preset.cors}`);
+    }
+
+    // Apply CORS preset if specified (can override header preset)
+    if (corsPreset && corsPresets[corsPreset]) {
+      defaultHeader.cors.preset = corsPresets[corsPreset];
+      console.log(`🌐 Applied CORS preset '${corsPreset}': cors=${corsPresets[corsPreset]}`);
+    }
+
+    // Apply cache preset (can override header preset)
+    if (cacheValue !== undefined) {
+      defaultHeader.cache.preset = cacheValue;
+    }
+
+    // Wait for confirmations if not skipped
+    if (!skipWait && hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
+      const confirmationsToWait = parseInt(confirmations);
+      console.log(`⏳ Waiting for ${confirmationsToWait} confirmations before verification to allow Etherscan indexing...`);
+      
+      try {
+        // Get the current block number
+        const currentBlock = await hre.ethers.provider.getBlockNumber();
+        const targetBlock = currentBlock + confirmationsToWait;
+        
+        console.log(`📊 Current block: ${currentBlock}, waiting for block: ${targetBlock}`);
+        
+        // Wait for the target block
+        await new Promise((resolve) => {
+          const checkBlock = async () => {
+            const latestBlock = await hre.ethers.provider.getBlockNumber();
+            if (latestBlock >= targetBlock) {
+              console.log(`✅ Reached block ${latestBlock}, proceeding with verification...`);
+              resolve(undefined);
+            } else {
+              console.log(`⏳ Current block: ${latestBlock}, waiting...`);
+              setTimeout(checkBlock, 10000); // Check every 10 seconds
+            }
+          };
+          checkBlock();
+        });
+      } catch (error) {
+        console.log(`⚠️  Could not wait for confirmations: ${error}`);
+        console.log(`Proceeding with verification anyway...`);
+      }
+    }
 
     try {
       await hre.run("verify:verify", {
@@ -343,11 +433,10 @@ task("site:verify", "Verify deployed Web3Site contract")
       });
       console.log("✅ Web3Site verified successfully!");
     } catch (error: any) {
-      if (error.message.includes("Already Verified")) {
+      if (error.message.includes("already been verified") || error.message.includes("Already Verified")) {
         console.log("ℹ️  Web3Site already verified");
       } else {
-        console.error("❌ Verification failed:", error);
-        process.exit(1);
+        console.log("❌ Verification failed:", error.message);
       }
     }
   });
