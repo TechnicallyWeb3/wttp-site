@@ -17,7 +17,7 @@
     "src/**/*",
     "test/**/*",
     "hardhat.config.ts",
-    "typechain-types/**/*",
+    "typechain-types/**/*", "src/tasks", "src/scripts",
   ],
   "exclude": [
     "node_modules",
