@@ -5,6 +5,7 @@ import { IBaseWTTPSite, READ_ONLY_PUBLIC_HEADER } from "@wttp/core";
 import { getMimeType, mimeTypeToBytes2 } from "./uploadFile";
 import { uploadFile } from "./uploadFile";
 import { DEFINERequestStruct, HEADRequestStruct } from "@wttp/core";
+import { normalizePath } from "./pathUtils";
 
 const MAX_CHUNK_SIZE = 32 * 1024;
 
@@ -100,6 +101,8 @@ function createDirectoryMetadata(dirPath: string, basePath: string): Record<stri
   return { "directory": directoryMetadata };
 }
 
+
+
 // Main upload directory function with enhanced error handling and validation
 export async function uploadDirectory(
   wttpSite: IBaseWTTPSite,
@@ -116,20 +119,17 @@ export async function uploadDirectory(
     throw new Error(`Source path ${sourcePath} is not a directory`);
   }
   
-  // Normalize destination path to ensure it ends with a slash
-  if (!destinationPath.endsWith("/")) {
-    destinationPath += "/";
-  }
+  destinationPath = normalizePath(destinationPath);
   
   // Find the index files for the directory
   const indexFiles = findIndexFiles(sourcePath);
-  let indexLocation = indexFiles.length > 1 ? "directory:" : `./${indexFiles[0]}`; // Default to index.html even if it doesn't exist
+  let indexLocation = `./${indexFiles[0]}`; // Defaults to index.html even if it doesn't exist
   
   // single index file
   let redirectCode = 301;
   let tempMetadataPath: string | null = null;
 
-  if (indexLocation === "directory:") {
+  if (indexFiles.length > 1) {
     // Multiple choices
     redirectCode = 300;
 

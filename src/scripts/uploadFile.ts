@@ -4,6 +4,7 @@ import path from "path";
 import { IBaseWTTPSite, LOCATEResponseStruct } from "@wttp/core";
 import mime from "mime-types";
 import { fetchResource } from "./fetchResource";
+import { normalizePath } from "./pathUtils";
 
 // Constants
 const CHUNK_SIZE = 32 * 1024; // 32KB chunks
@@ -108,6 +109,13 @@ export async function uploadFile(
     throw new Error(`Source path is not a file: ${sourcePath}`);
   }
   
+  // Normalize the destination path
+  try {
+    destinationPath = normalizePath(destinationPath);
+  } catch (error) {
+    throw new Error(`Invalid destination path format: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+  
   // Read file with error handling
   let fileData: Buffer;
   try {
@@ -161,9 +169,9 @@ export async function uploadFile(
   
   // Get the DPS and DPR contracts once for efficiency
   const dpsAddress = await wttpSite.DPS();
-  const dps = await ethers.getContractAt("IDataPointStorage", dpsAddress);
+  const dps = await ethers.getContractAt("@tw3/esp/contracts/interfaces/IDataPointStorage.sol:IDataPointStorage", dpsAddress);
   const dprAddress = await wttpSite.DPR();
-  const dpr = await ethers.getContractAt("IDataPointRegistry", dprAddress);
+  const dpr = await ethers.getContractAt("@tw3/esp/contracts/interfaces/IDataPointRegistry.sol:IDataPointRegistry", dprAddress);
   
   let totalRoyalty = 0n;
   

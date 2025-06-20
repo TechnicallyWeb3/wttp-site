@@ -3,6 +3,7 @@
 
 import { ethers } from "hardhat";
 import { HEADRequestStruct, ORIGINS_ADMIN_ONLY, type HEADResponseStruct, type IBaseWTTPSite, type LOCATEResponseStruct, type RangeStruct } from "@wttp/core";
+import { normalizePath } from "./pathUtils";
 // import { getContractAddress } from "@tw3/esp";
 
 /**
@@ -36,8 +37,12 @@ export async function fetchResource(
   if (!path) {
     path = "/";
   }
-  if (!path.startsWith('/')) {
-    throw new Error("Resource path must start with '/'");
+  
+  // Normalize the path for consistent lookup
+  try {
+    path = normalizePath(path);
+  } catch (error) {
+    throw new Error(`Invalid path format: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
   
   const { 

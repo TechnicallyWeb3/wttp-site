@@ -2,6 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { TestWTTPSite } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { normalizePath } from "../src/scripts/pathUtils";
 
 describe("🔧 DEFINE Method - Comprehensive Testing", function () {
   let testWTTPSite: TestWTTPSite;
@@ -551,6 +552,105 @@ describe("🔧 DEFINE Method - Comprehensive Testing", function () {
       expect(defineResponse.head.status).to.equal(200);
     });
 
+  });
+
+  describe("📁 Directory Headers & Path Normalization", function () {
+
+    it("should define directory headers with redirect behavior", async function () {
+      const testPath = "/api/directory";
+      const normalizedPath = normalizePath("/api/directory/"); // Should normalize to /api/directory
+      
+      expect(normalizedPath).to.equal("/api/directory");
+
+      // Create directory-like header with redirect
+      const directoryHeader = {
+        cache: { immutableFlag: false, preset: 0, custom: "" },
+        cors: {
+          methods: 511, // All methods
+          origins: Array(9).fill(publicRole),
+          preset: 0,
+          custom: "directory-cors"
+        },
+        redirect: { code: 301, location: "./index.html" } // Directory redirect to index
+      };
+
+      await testWTTPSite.connect(siteAdmin).DEFINE({
+        head: { path: normalizedPath, ifModifiedSince: 0, ifNoneMatch: ethers.ZeroHash },
+        data: directoryHeader
+      });
+
+      const headResponse = await testWTTPSite.connect(user1).HEAD({
+        path: normalizedPath,
+        ifModifiedSince: 0,
+        ifNoneMatch: ethers.ZeroHash
+      });
+
+      expect(headResponse.status).to.equal(301);
+      expect(headResponse.headerInfo.redirect.location).to.equal("./index.html");
+    });
+
+    it("should define multiple choice directory headers", async function () {
+      const testPath = "/api/multichoice";
+
+      // Create directory header with multiple choices (300)
+      const multiChoiceHeader = {
+        cache: { immutableFlag: false, preset: 0, custom: "" },
+        cors: {
+          methods: 511,
+          origins: Array(9).fill(publicRole),
+          preset: 0,
+          custom: ""
+        },
+        redirect: { 
+          code: 300, 
+          location: JSON.stringify({
+            "directory": {
+              "index.html": { "mimeType": "text/html", "charset": "utf-8", "encoding": "identity", "language": "en-US" },
+              "index.js": { "mimeType": "application/javascript", "charset": "utf-8", "encoding": "identity", "language": "en-US" },
+              "README.md": { "mimeType": "text/markdown", "charset": "utf-8", "encoding": "identity", "language": "en-US" }
+            }
+          })
+        }
+      };
+
+      await testWTTPSite.connect(siteAdmin).DEFINE({
+        head: { path: testPath, ifModifiedSince: 0, ifNoneMatch: ethers.ZeroHash },
+        data: multiChoiceHeader
+      });
+
+      const headResponse = await testWTTPSite.connect(user1).HEAD({
+        path: testPath,
+        ifModifiedSince: 0,
+        ifNoneMatch: ethers.ZeroHash
+      });
+
+      expect(headResponse.status).to.equal(300);
+      expect(headResponse.headerInfo.redirect.location).to.include("directory");
+      expect(headResponse.headerInfo.redirect.location).to.include("index.html");
+    });
+
+    it("should handle path normalization in DEFINE operations", async function () {
+      const pathVariations = [
+        "/api/test",
+        "/api/test/",
+        "api/test",
+        "api/test/"
+      ];
+
+      for (const originalPath of pathVariations) {
+        const normalizedPath = normalizePath(originalPath);
+        expect(normalizedPath).to.equal("/api/test", 
+          `Path "${originalPath}" didn't normalize correctly`);
+      }
+
+      // DEFINE should work with the normalized path
+      const response = await testWTTPSite.connect(siteAdmin).DEFINE({
+        head: { path: "/api/test", ifModifiedSince: 0, ifNoneMatch: ethers.ZeroHash },
+        data: customDefineHeader
+      });
+
+      expect(response).to.not.be.reverted;
+    });
   });
 
   describe("⚠️ Edge Cases & Error Handling", function () {

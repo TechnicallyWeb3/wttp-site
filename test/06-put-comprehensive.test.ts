@@ -4,6 +4,7 @@ import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { loadEspContracts, createUniqueData } from "./helpers/espHelpers";
 import { TestWTTPSite } from "../typechain-types";
 import { IDataPointRegistry, IDataPointStorage } from "@wttp/core";
+import { normalizePath } from "../src/scripts/pathUtils";
 
 describe("06 - PUT Method Comprehensive Testing", function () {
   let testWTTPSite: TestWTTPSite;
@@ -609,7 +610,62 @@ describe("06 - PUT Method Comprehensive Testing", function () {
     });
   });
 
-  // CATEGORY 6: Edge Cases & Error Handling
+  // CATEGORY 6: Path Normalization Integration
+  describe("🔧 PUT Path Normalization", function () {
+    
+    it("should handle normalized paths in PUT operations", async function () {
+      const testData = createUniqueData("Path normalization test");
+      const originalPath = "/api/users/";
+      const normalizedPath = normalizePath(originalPath);
+      
+      expect(normalizedPath).to.equal("/api/users"); // Should remove trailing slash
+      
+      // PUT should work with normalized path
+      const response = await testWTTPSite.connect(siteAdmin).PUT({
+        head: { path: normalizedPath, ifModifiedSince: 0, ifNoneMatch: ethers.ZeroHash },
+        properties: { mimeType: "0x616f", charset: "0x7438", encoding: "0x7a67", language: "0x747a" },
+        data: [{ data: ethers.toUtf8Bytes(testData), chunkIndex: 0, publisher: siteAdmin.address }]
+      });
+      
+      expect(response).to.not.be.reverted;
+      expect(Number((await response.wait())?.status)).to.equal(1); // Success
+    });
+
+    // not an issue, the contract accepts any path, the handler will reject this though. And our tooling won't allow it even though the contract can technically handle it.
+    // it("should reject malformed paths in PUT operations", async function () {
+    //   const testData = createUniqueData("Malformed path test");
+      
+    //   // Test double slash paths - should be rejected by path validation
+    //   const malformedPath = "//invalid";
+    //   await expect(
+    //     testWTTPSite.connect(siteAdmin).PUT({
+    //       head: { path: malformedPath, ifModifiedSince: 0, ifNoneMatch: ethers.ZeroHash },
+    //       properties: { mimeType: "0x616f", charset: "0x7438", encoding: "0x7a67", language: "0x747a" },
+    //       data: [{ data: ethers.toUtf8Bytes(testData), chunkIndex: 0, publisher: siteAdmin.address }]
+    //     })
+    //   ).to.be.rejected;
+    // });
+
+    it("should normalize various path formats consistently", async function () {
+      const testData = createUniqueData("Path format consistency test");
+      
+      // All these should normalize to the same path
+      const pathVariations = [
+        "/api/data",
+        "/api/data/",
+        "api/data",
+        "api/data/"
+      ];
+      
+      for (let i = 0; i < pathVariations.length; i++) {
+        const normalizedPath = normalizePath(pathVariations[i]);
+        expect(normalizedPath).to.equal("/api/data", 
+          `Path "${pathVariations[i]}" didn't normalize correctly`);
+      }
+    });
+  });
+
+  // CATEGORY 7: Edge Cases & Error Handling
   describe("⚠️ PUT Edge Cases", function () {
     
     it("should handle resource conflicts gracefully", async function () {
