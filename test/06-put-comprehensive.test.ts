@@ -615,20 +615,30 @@ describe("06 - PUT Method Comprehensive Testing", function () {
     
     it("should handle normalized paths in PUT operations", async function () {
       const testData = createUniqueData("Path normalization test");
-      const originalPath = "/api/users/";
-      const normalizedPath = normalizePath(originalPath);
+      const originalPath = "/api/users";
+      const normalizedPath = normalizePath(originalPath, true);
       
-      expect(normalizedPath).to.equal("/api/users"); // Should remove trailing slash
+      expect(normalizedPath).to.equal("/api/users/"); // Should remove trailing slash
       
       // PUT should work with normalized path
-      const response = await testWTTPSite.connect(siteAdmin).PUT({
+      const response = await testWTTPSite.connect(siteAdmin).DEFINE({
         head: { path: normalizedPath, ifModifiedSince: 0, ifNoneMatch: ethers.ZeroHash },
-        properties: { mimeType: "0x616f", charset: "0x7438", encoding: "0x7a67", language: "0x747a" },
-        data: [{ data: ethers.toUtf8Bytes(testData), chunkIndex: 0, publisher: siteAdmin.address }]
+        data: {
+          ...defaultHeader,
+          redirect: { code: 301, location: "./index.html" }
+        }
       });
       
       expect(response).to.not.be.reverted;
-      expect(Number((await response.wait())?.status)).to.equal(1); // Success
+
+      const headResponse = await testWTTPSite.connect(user1).HEAD({ 
+        path: normalizedPath, 
+        ifModifiedSince: 0, 
+        ifNoneMatch: ethers.ZeroHash 
+      });
+      
+      expect(headResponse.headerInfo.redirect.code).to.equal(301);
+      expect(headResponse.headerInfo.redirect.location).to.equal("./index.html");
     });
 
     // not an issue, the contract accepts any path, the handler will reject this though. And our tooling won't allow it even though the contract can technically handle it.
@@ -650,18 +660,28 @@ describe("06 - PUT Method Comprehensive Testing", function () {
       const testData = createUniqueData("Path format consistency test");
       
       // All these should normalize to the same path
-      const pathVariations = [
+      const fileVariations = [
         "/api/data",
-        "/api/data/",
         "api/data",
-        "api/data/"
       ];
       
-      for (let i = 0; i < pathVariations.length; i++) {
-        const normalizedPath = normalizePath(pathVariations[i]);
+      for (let i = 0; i < fileVariations.length; i++) {
+        const normalizedPath = normalizePath(fileVariations[i]);
         expect(normalizedPath).to.equal("/api/data", 
-          `Path "${pathVariations[i]}" didn't normalize correctly`);
+          `Path "${fileVariations[i]}" didn't normalize correctly`);
       }
+
+      const dirVariations = [
+        "/api/data/",
+        "api/data/",
+      ];
+      
+      for (let i = 0; i < dirVariations.length; i++) {
+        const normalizedPath = normalizePath(dirVariations[i], true);
+        expect(normalizedPath).to.equal("/api/data/", 
+          `Path "${dirVariations[i]}" didn't normalize correctly`);
+      }
+      
     });
   });
 

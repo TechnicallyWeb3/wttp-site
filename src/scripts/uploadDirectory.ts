@@ -119,7 +119,7 @@ export async function uploadDirectory(
     throw new Error(`Source path ${sourcePath} is not a directory`);
   }
   
-  destinationPath = normalizePath(destinationPath);
+  destinationPath = normalizePath(destinationPath, true);
   
   // Find the index files for the directory
   const indexFiles = findIndexFiles(sourcePath);

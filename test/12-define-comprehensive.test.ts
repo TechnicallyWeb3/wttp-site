@@ -558,9 +558,9 @@ describe("🔧 DEFINE Method - Comprehensive Testing", function () {
 
     it("should define directory headers with redirect behavior", async function () {
       const testPath = "/api/directory";
-      const normalizedPath = normalizePath("/api/directory/"); // Should normalize to /api/directory
+      const normalizedPath = normalizePath(testPath, true); // Should normalize to /api/directory/
       
-      expect(normalizedPath).to.equal("/api/directory");
+      expect(normalizedPath).to.equal("/api/directory/");
 
       // Create directory-like header with redirect
       const directoryHeader = {
@@ -630,22 +630,31 @@ describe("🔧 DEFINE Method - Comprehensive Testing", function () {
     });
 
     it("should handle path normalization in DEFINE operations", async function () {
-      const pathVariations = [
+      const fileVariations = [
         "/api/test",
-        "/api/test/",
         "api/test",
-        "api/test/"
       ];
 
-      for (const originalPath of pathVariations) {
+      for (const originalPath of fileVariations) {
         const normalizedPath = normalizePath(originalPath);
         expect(normalizedPath).to.equal("/api/test", 
           `Path "${originalPath}" didn't normalize correctly`);
       }
 
+      const dirVariations = [
+        "/api/test/",
+        "api/test/",
+      ];
+      
+      for (const originalPath of dirVariations) {
+        const normalizedPath = normalizePath(originalPath, true);
+        expect(normalizedPath).to.equal("/api/test/", 
+          `Path "${originalPath}" didn't normalize correctly`);
+      }
+
       // DEFINE should work with the normalized path
       const response = await testWTTPSite.connect(siteAdmin).DEFINE({
-        head: { path: "/api/test", ifModifiedSince: 0, ifNoneMatch: ethers.ZeroHash },
+        head: { path: normalizePath("/api/test", true), ifModifiedSince: 0, ifNoneMatch: ethers.ZeroHash },
         data: customDefineHeader
       });
 

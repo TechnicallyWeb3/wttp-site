@@ -34,13 +34,9 @@ export async function fetchResource(
     // TODO: should validate that siteAddress is a valid address
     throw new Error("Site address is required");
   }
-  if (!path) {
-    path = "/";
-  }
-  
-  // Normalize the path for consistent lookup
+
   try {
-    path = normalizePath(path);
+    path = normalizePath(path || "/", undefined, false); // forces absolute path
   } catch (error) {
     throw new Error(`Invalid path format: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }

@@ -8,7 +8,7 @@ import { normalizePath, pathIndicatesDirectory, displayPath, validatePathEdgeCas
 import { fetchResource } from "../src/scripts/fetchResource";
 import { uploadDirectory } from "../src/scripts/uploadDirectory";
 import fs from "fs";
-import path from "path";
+import path, { relative } from "path";
 import os from "os";
 
 describe("13 - Directory Upload & Path Normalization Comprehensive Testing", function () {
@@ -80,26 +80,49 @@ describe("13 - Directory Upload & Path Normalization Comprehensive Testing", fun
   describe("🔧 Path Normalization Utilities", function () {
     
     it("should normalize basic paths correctly", async function () {
+      // Absolute paths (non-directory)
       expect(normalizePath("/path")).to.equal("/path");
-      expect(normalizePath("/path/")).to.equal("/path");
+      expect(normalizePath("/path/")).to.equal("/path/");
       expect(normalizePath("path")).to.equal("/path");
-      expect(normalizePath("path/")).to.equal("/path");
+      expect(normalizePath("path/")).to.equal("/path/");
       expect(normalizePath("/")).to.equal("/");
       expect(normalizePath("")).to.equal("/");
+
+      // Absolute paths (directory)
+      expect(normalizePath("/path", true)).to.equal("/path/");
+      expect(normalizePath("/path/", true)).to.equal("/path/");
+      expect(normalizePath("path", true)).to.equal("/path/");
+      expect(normalizePath("path/", true)).to.equal("/path/");
+      expect(normalizePath("/", true)).to.equal("/");
+      expect(normalizePath("", true)).to.equal("/");
+
+    //   // Relative paths (non-directory)
+    //   expect(normalizePath("./path", undefined, true)).to.equal("./path");
+    //   expect(normalizePath("../path", undefined, true)).to.equal("../path");
+    //   expect(normalizePath("../../path", undefined, true)).to.equal("../../path");
+
+    //   // Relative paths (directory)
+    //   expect(normalizePath("./path", true, true)).to.equal("./path/");
+    //   expect(normalizePath("../path", true, true)).to.equal("../path/");
+    //   expect(normalizePath("../../path", true, true)).to.equal("../../path/");
     });
 
     it("should handle edge cases without failing", async function () {
-      // Whitespace handling
-      expect(normalizePath("  /path  ")).to.equal("/path");
-      expect(normalizePath("  /path/  ")).to.equal("/path");
+      // Whitespace handling (absolute paths)
+      expect(normalizePath("  /path/  ")).to.equal("/path/");
+      expect(normalizePath("  /path/  ", false)).to.equal("/path");
       
-      // Complex paths
+      // Complex paths (absolute)
       expect(normalizePath("/api/v1/users")).to.equal("/api/v1/users");
-      expect(normalizePath("/api/v1/users/")).to.equal("/api/v1/users");
+      expect(normalizePath("/api/v1/users", true)).to.equal("/api/v1/users/");
       
       // Single character paths
       expect(normalizePath("/a")).to.equal("/a");
-      expect(normalizePath("/a/")).to.equal("/a");
+      expect(normalizePath("/a", true)).to.equal("/a/");
+
+    //   // Relative paths with whitespace
+    //   expect(normalizePath("  ./path  ", undefined, true)).to.equal("./path");
+    //   expect(normalizePath("  ../path  ", true, true)).to.equal("../path/");
     });
 
     it("should reject malformed paths appropriately", async function () {
@@ -108,54 +131,149 @@ describe("13 - Directory Upload & Path Normalization Comprehensive Testing", fun
         "/path//subpath",   // Double slash in middle
         "/path///",         // Multiple trailing slashes
         "path//",           // Double slash after no leading slash
+        // without the relative indicator, cannot test these
+        // "/../bad",          // Relative path without starting with .
+        // "/./bad",          // Absolute path with ./ in middle
       ];
 
       for (const testPath of malformedPaths) {
         expect(() => normalizePath(testPath)).to.throw();
       }
+
+    //   // Relative directory paths must contain ./
+    //   expect(() => normalizePath("path", true, true)).to.throw();
+    //   expect(() => normalizePath("path/", true, true)).to.throw();
     });
 
     it("should correctly identify directory indicators", async function () {
+      // Absolute paths
       expect(pathIndicatesDirectory("/path/")).to.be.true;
       expect(pathIndicatesDirectory("/api/users/")).to.be.true;
       expect(pathIndicatesDirectory("/path")).to.be.false;
       expect(pathIndicatesDirectory("/api/users")).to.be.false;
-      expect(pathIndicatesDirectory("/")).to.be.false; // Root is special case
+      expect(pathIndicatesDirectory("/")).to.be.true;
       expect(pathIndicatesDirectory("")).to.be.false;
+
+      // Relative paths
+      expect(pathIndicatesDirectory("./path/")).to.be.true;
+      expect(pathIndicatesDirectory("../path/")).to.be.true;
+      expect(pathIndicatesDirectory("./path")).to.be.false;
+      expect(pathIndicatesDirectory("../path")).to.be.false;
     });
 
     it("should format display paths correctly", async function () {
+      // Absolute paths
       expect(displayPath("/path", true)).to.equal("/path/");
-      expect(displayPath("/path", false)).to.equal("/path");
-      expect(displayPath("/", true)).to.equal("/"); // Root never gets trailing slash
-      expect(displayPath("/", false)).to.equal("/");
+      expect(displayPath("/path")).to.equal("/path");
+      expect(displayPath("/", true)).to.equal("/");
+      expect(displayPath("/")).to.equal("/");
+      expect(displayPath("")).to.equal("/");
+
+    //   // Relative paths
+    //   expect(displayPath("./path", true)).to.equal("./path/");
+    //   expect(displayPath("./path")).to.equal("./path");
+    //   expect(displayPath("../path", true)).to.equal("../path/");
+    //   expect(displayPath("../path")).to.equal("../path");
     });
 
     it("should validate edge cases systematically", async function () {
       const testCases = [
+        // Absolute paths
         { path: "/valid/path", shouldPass: true },
         { path: "/valid/path/", shouldPass: true },
         { path: "valid/path", shouldPass: true },
+        { path: "", shouldPass: true },
+        { path: "   ", shouldPass: true },
+        
+        // Relative paths
+        { path: "./valid/path", shouldPass: false },
+        { path: "../valid/path", shouldPass: false },
+        { path: "../../valid/path", shouldPass: false },
+        
+        // Invalid paths
         { path: "//invalid", shouldPass: false },
         { path: "/path//invalid", shouldPass: false },
-        { path: "", shouldPass: true }, // Empty becomes root
-        { path: "   ", shouldPass: true }, // Whitespace becomes root
+
+        // not technically valid but will pass normalization
+        { path: "/../invalid", shouldPass: true },
+        { path: "/./invalid", shouldPass: true },
+        { path: ".invalid", shouldPass: true },
       ];
 
       for (const testCase of testCases) {
         const result = validatePathEdgeCases(testCase.path);
         expect(result.isValid).to.equal(testCase.shouldPass, 
-          `Path "${testCase.path}" validation failed`);
+          `Path "${testCase.path}" validation failed${result.normalized ? `, normalized to "${result.normalized}"` : ''}`);
       }
     });
   });
 
   // CATEGORY 2: Contract-Level Path Behavior
-  describe("🔒 Contract Path Behavior & Trailing Slash Security", function () {
+  describe("🔒 Contract Path Behavior & Directory Semantics", function () {
     
+    it("should handle directory paths correctly in contract calls", async function () {
+      const dirPath = "/api/users/"; // Directory path with trailing slash
+      
+      // Create a DIRECTORY using DEFINE with 301 redirect
+      await testWTTPSite.connect(siteAdmin).DEFINE({
+        head: { path: dirPath, ifModifiedSince: 0, ifNoneMatch: ethers.ZeroHash },
+        data: {
+          ...defaultHeader,
+          redirect: { code: 301, location: "./index.html" }
+        }
+      });
+      
+      // Directory path should work and return 301
+      const dirResponse = await testWTTPSite.connect(user1).HEAD({
+        path: dirPath,
+        ifModifiedSince: 0,
+        ifNoneMatch: ethers.ZeroHash
+      });
+      expect(Number(dirResponse.status)).to.equal(301);
+      expect(dirResponse.headerInfo.redirect.location).to.equal("./index.html");
+      
+      // Non-directory path should fail
+      await expect(
+        testWTTPSite.connect(user1).HEAD({
+          path: "/api/users",
+          ifModifiedSince: 0,
+          ifNoneMatch: ethers.ZeroHash
+        })
+      ).to.be.revertedWithCustomError(testWTTPSite, "_404");
+    });
+
+    it("should handle file paths correctly in contract calls", async function () {
+      const filePath = "/api/config"; // File path without trailing slash
+      const testData = createUniqueData("Test file content");
+      
+      // Create a FILE using PUT
+      await testWTTPSite.connect(siteAdmin).PUT({
+        head: { path: filePath, ifModifiedSince: 0, ifNoneMatch: ethers.ZeroHash },
+        properties: { mimeType: "0x616f", charset: "0x7438", encoding: "0x7a67", language: "0x747a" },
+        data: [{ data: ethers.toUtf8Bytes(testData), chunkIndex: 0, publisher: siteAdmin.address }]
+      });
+      
+      // File path should work
+      const fileResponse = await testWTTPSite.connect(user1).HEAD({
+        path: filePath,
+        ifModifiedSince: 0,
+        ifNoneMatch: ethers.ZeroHash
+      });
+      expect(Number(fileResponse.status)).to.equal(200);
+      
+      // Directory-style path should fail
+      await expect(
+        testWTTPSite.connect(user1).HEAD({
+          path: filePath + "/",
+          ifModifiedSince: 0,
+          ifNoneMatch: ethers.ZeroHash
+        })
+      ).to.be.revertedWithCustomError(testWTTPSite, "_404");
+    });
+
     it("should reject direct contract calls with trailing slash (except root)", async function () {
-      const normalizedPath = "/api/users";
-      const trailingSlashPath = "/api/users/";
+      const normalizedPath = "/api/users/"; // Changed to include trailing slash for directory
+      const nonNormalizedPath = "/api/users";
       
       // First create a DIRECTORY at the normalized path using DEFINE with 301 redirect
       await testWTTPSite.connect(siteAdmin).DEFINE({
@@ -175,10 +293,10 @@ describe("13 - Directory Upload & Path Normalization Comprehensive Testing", fun
       expect(Number(normalizedResponse.status)).to.equal(301);
       expect(normalizedResponse.headerInfo.redirect.location).to.equal("./index.html");
       
-      // Now test that calling with trailing slash fails with 404
+      // Now test that calling without trailing slash fails with 404
       await expect(
         testWTTPSite.connect(user1).HEAD({
-          path: trailingSlashPath,
+          path: nonNormalizedPath,
           ifModifiedSince: 0,
           ifNoneMatch: ethers.ZeroHash
         })
@@ -186,14 +304,14 @@ describe("13 - Directory Upload & Path Normalization Comprehensive Testing", fun
 
       await expect(
         testWTTPSite.connect(user1).GET({
-          head: { path: trailingSlashPath, ifModifiedSince: 0, ifNoneMatch: ethers.ZeroHash },
+          head: { path: nonNormalizedPath, ifModifiedSince: 0, ifNoneMatch: ethers.ZeroHash },
           rangeChunks: { start: 0, end: 0 }
         })
       ).to.be.revertedWithCustomError(testWTTPSite, "_404");
     });
 
     it("should accept normalized paths in contract calls", async function () {
-      const testPath = "/api/users";
+      const testPath = "/api/users"; // Non-directory path, no trailing slash
       const testData = createUniqueData("Test API users content");
       
       // Create resource first
@@ -215,9 +333,9 @@ describe("13 - Directory Upload & Path Normalization Comprehensive Testing", fun
 
     it("should demonstrate trailing slash behavior across multiple directories", async function () {
       const testCases = [
-        { normalized: "/docs", withSlash: "/docs/" },
-        { normalized: "/api/v1/users", withSlash: "/api/v1/users/" },
-        { normalized: "/files/assets", withSlash: "/files/assets/" }
+        { normalized: "/docs/", withoutSlash: "/docs" },
+        { normalized: "/api/v1/users/", withoutSlash: "/api/v1/users" },
+        { normalized: "/files/assets/", withoutSlash: "/files/assets" }
       ];
       
       for (const testCase of testCases) {
@@ -240,10 +358,10 @@ describe("13 - Directory Upload & Path Normalization Comprehensive Testing", fun
           `Normalized directory path ${testCase.normalized} should return 301`);
         expect(normalizedResponse.headerInfo.redirect.location).to.equal("./index.html");
         
-        // Path with trailing slash should fail with 404
+        // Path without trailing slash should fail with 404
         await expect(
           testWTTPSite.connect(user1).HEAD({
-            path: testCase.withSlash,
+            path: testCase.withoutSlash,
             ifModifiedSince: 0,
             ifNoneMatch: ethers.ZeroHash
           })
@@ -308,7 +426,7 @@ describe("13 - Directory Upload & Path Normalization Comprehensive Testing", fun
     });
 
     it("should handle fetchResource script normalization gracefully", async function () {
-      const testPath = "/api/data";
+      const testPath = "/api/data/";
       const testData = createUniqueData("Test fetch normalization");
       
       // Create resource with normalized path
@@ -318,9 +436,9 @@ describe("13 - Directory Upload & Path Normalization Comprehensive Testing", fun
         data: [{ data: ethers.toUtf8Bytes(testData), chunkIndex: 0, publisher: siteAdmin.address }]
       });
       
-      // fetchResource should normalize "/api/data/" to "/api/data" and succeed
+      // fetchResource requires normalized, absolute paths
       const siteAddress = await testWTTPSite.getAddress();
-      const response = await fetchResource(siteAddress, "/api/data/"); // With trailing slash
+      const response = await fetchResource(siteAddress, testPath); // With trailing slash
       
       expect(Number(response.response.head.status)).to.equal(200);
       expect(response.response).to.not.be.undefined;
@@ -343,12 +461,12 @@ describe("13 - Directory Upload & Path Normalization Comprehensive Testing", fun
         ifNoneMatch: ethers.ZeroHash
       });
       
-      expect(Number(headResponse1.status)).to.equal(200);
+      expect(headResponse1.status).to.equal(200n);
       
       // fetchResource should also work with root
       const siteAddress = await testWTTPSite.getAddress();
       const response = await fetchResource(siteAddress, "/");
-      expect(Number(response.response.head.status)).to.equal(200);
+      expect(response.response.head.status).to.equal(200n);
     });
   });
 
@@ -379,7 +497,7 @@ describe("13 - Directory Upload & Path Normalization Comprehensive Testing", fun
       
       // Check directory was created with correct redirect
       const headResponse = await testWTTPSite.connect(user1).HEAD({
-        path: "/testdir",
+        path: "/testdir/",
         ifModifiedSince: 0,
         ifNoneMatch: ethers.ZeroHash
       });
@@ -400,7 +518,7 @@ describe("13 - Directory Upload & Path Normalization Comprehensive Testing", fun
       
       // Check directory was created with multiple choices redirect
       const headResponse = await testWTTPSite.connect(user1).HEAD({
-        path: "/multidir",
+        path: "/multidir/",
         ifModifiedSince: 0,
         ifNoneMatch: ethers.ZeroHash
       });
@@ -423,9 +541,9 @@ describe("13 - Directory Upload & Path Normalization Comprehensive Testing", fun
       
       await uploadDirectory(testWTTPSite, tempDir, "/nested");
       
-      // Check root directory
+      // Check root directory, should have been normalized to /nested/
       const rootResponse = await testWTTPSite.connect(user1).HEAD({
-        path: "/nested",
+        path: "/nested/",
         ifModifiedSince: 0,
         ifNoneMatch: ethers.ZeroHash
       });
@@ -433,7 +551,7 @@ describe("13 - Directory Upload & Path Normalization Comprehensive Testing", fun
       
       // Check subdirectory
       const subResponse = await testWTTPSite.connect(user1).HEAD({
-        path: "/nested/subdir",
+        path: "/nested/subdir/",
         ifModifiedSince: 0,
         ifNoneMatch: ethers.ZeroHash
       });
@@ -448,9 +566,9 @@ describe("13 - Directory Upload & Path Normalization Comprehensive Testing", fun
       // Upload with trailing slash - should be normalized
       await uploadDirectory(testWTTPSite, tempDir, "/normalized/");
       
-      // Should be accessible without trailing slash
+      // Should be accessible only with trailing slash
       const headResponse = await testWTTPSite.connect(user1).HEAD({
-        path: "/normalized",
+        path: "/normalized/",
         ifModifiedSince: 0,
         ifNoneMatch: ethers.ZeroHash
       });
@@ -574,29 +692,28 @@ describe("13 - Directory Upload & Path Normalization Comprehensive Testing", fun
     });
 
     it("should handle fetchResource with various path formats", async function () {
-      const testData = createUniqueData("Path format test content");
-      const normalizedPath = "/api/test";
+      const normalizedPath = "/api/test/";
       
       // Create resource
-      await testWTTPSite.connect(siteAdmin).PUT({
+      await testWTTPSite.connect(siteAdmin).DEFINE({
         head: { path: normalizedPath, ifModifiedSince: 0, ifNoneMatch: ethers.ZeroHash },
-        properties: { mimeType: "0x616f", charset: "0x7438", encoding: "0x7a67", language: "0x747a" },
-        data: [{ data: ethers.toUtf8Bytes(testData), chunkIndex: 0, publisher: siteAdmin.address }]
+        data: {
+          ...defaultHeader,
+          redirect: { code: 301, location: "./index.html" }
+        }
       });
       
       const siteAddress = await testWTTPSite.getAddress();
       
       // Test various path formats that should all normalize to the same resource
       const pathVariations = [
-        "/api/test",
         "/api/test/", 
-        "api/test",
         "api/test/",
       ];
       
       for (const pathVariation of pathVariations) {
         const response = await fetchResource(siteAddress, pathVariation);
-        expect(Number(response.response.head.status)).to.equal(200, 
+        expect(response.response.head.status).to.equal(301n, 
           `Path variation "${pathVariation}" failed`);
       }
     });
@@ -610,8 +727,10 @@ describe("13 - Directory Upload & Path Normalization Comprehensive Testing", fun
       expect(pathIndicatesDirectory(originalFilePath)).to.be.false;
       
       // Both normalize to the same storage path
-      expect(normalizePath(originalDirectoryPath)).to.equal("/api/users");
+      expect(normalizePath(originalDirectoryPath)).to.equal("/api/users/");
+      expect(normalizePath(originalDirectoryPath, false)).to.equal("/api/users");
       expect(normalizePath(originalFilePath)).to.equal("/api/users");
+      expect(normalizePath(originalFilePath, true)).to.equal("/api/users/");
       
       // But can be displayed differently
       expect(displayPath("/api/users", true)).to.equal("/api/users/");

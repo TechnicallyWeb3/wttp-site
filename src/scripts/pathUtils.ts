@@ -6,44 +6,29 @@
  */
 
 /**
- * Normalizes a path by removing trailing slashes (except root) and ensuring leading slash
+ * Normalizes a path by ensuring leading slash and handling trailing slashes based on directory status
  * 
  * This implements "soft semantic enforcement" where:
- * - Storage layer: Consistent, normalized paths without trailing slashes
- * - Presentation layer: Semantic trailing slashes added back for UX when needed
+ * - Storage layer: Consistent, normalized paths with trailing slashes for directories
+ * - Presentation layer: Semantic trailing slashes preserved for directories
  * - Behavior layer: Headers determine actual functionality (directory vs file)
  * 
  * @param path - The path to normalize
- * @returns Normalized path without trailing slash (except root "/")
+ * @param isDirectory - Optional flag indicating if the path represents a directory
+ * @returns Normalized path with trailing slash for directories (including root "/")
  * @throws Error if path is malformed (multiple consecutive slashes, etc.)
  */
-export function normalizePath(path: string): string {
-  // Handle empty or null paths
-  if (!path || path.trim() === '') {
-    return '/';
-  }
-
+export function normalizePath(path: string, isDirectory?: boolean): string {
   // Trim whitespace
   path = path.trim();
 
-  // Handle root case early
-  if (path === '/' || path === '') {
+  // Handle empty paths or root paths
+  if (path === '' || path === '/') {
     return '/';
   }
 
-  // Remove trailing slashes, but protect against malformed paths
-  if (path.endsWith('/')) {
-    path = path.slice(0, -1);
-    
-    // Check for malformed path with multiple trailing slashes
-    if (path.endsWith('/') && path !== '') {
-      throw new Error(`Malformed path with multiple trailing slashes: ${path}/`);
-    }
-  }
-
-  // Ensure the path starts with a slash
-  if (!path.startsWith('/')) {
-    path = '/' + path;
+  if (pathIndicatesRelative(path)) {
+    throw new Error(`Path should be absolute: ${path}`);
   }
 
   // Validate no double slashes in the middle
@@ -51,9 +36,20 @@ export function normalizePath(path: string): string {
     throw new Error(`Malformed path with double slashes: ${path}`);
   }
 
-  // Handle root case after processing
-  if (path === '') {
-    return '/';
+  // All paths except relative paths must start with a slash
+  if (!path.startsWith('/')) {
+    path = '/' + path;
+  }
+
+  if (isDirectory === undefined) {
+    isDirectory = pathIndicatesDirectory(path);
+  }
+
+  // Add trailing slash for directories, remove trailing slash for files
+  if (isDirectory) {
+    path = !path.endsWith('/') ? path + '/' : path;
+  } else {
+    path = path.endsWith('/') && path !== '/' ? path.slice(0, -1) : path;
   }
 
   return path;
@@ -72,7 +68,14 @@ export function pathIndicatesDirectory(originalPath: string): boolean {
   }
   
   const trimmed = originalPath.trim();
-  return trimmed !== '/' && trimmed.endsWith('/');
+  return trimmed.endsWith('/');
+}
+
+export function pathIndicatesRelative(originalPath: string): boolean {
+  if (!originalPath || originalPath.trim() === '') {
+    return false;
+  }
+  return originalPath.startsWith('.') && originalPath.includes('./') || originalPath === '.';
 }
 
 /**
@@ -81,14 +84,11 @@ export function pathIndicatesDirectory(originalPath: string): boolean {
  * 
  * @param normalizedPath - The normalized path
  * @param isDirectory - Whether this path should be displayed as a directory
- * @returns Path with trailing slash added if it's a directory (except root)
+ * @returns Path with trailing slash added if it's a directory
  */
-export function displayPath(normalizedPath: string, isDirectory: boolean): string {
-  if (!isDirectory || normalizedPath === '/') {
-    return normalizedPath;
-  }
-  
-  return normalizedPath + '/';
+export function displayPath(normalizedPath: string, isDirectory: boolean = false): string {
+  // Since normalizePath now handles directories correctly, we can just use it
+  return normalizePath(normalizedPath, isDirectory);
 }
 
 /**
@@ -98,13 +98,14 @@ export function displayPath(normalizedPath: string, isDirectory: boolean): strin
  * @param testPath - Path to validate
  * @returns Object with validation results
  */
-export function validatePathEdgeCases(testPath: string): {
+export function validatePathEdgeCases(testPath: string, isDirectory: boolean = false): {
   isValid: boolean;
+  indicatesDirectory?: boolean;
   normalized?: string;
   error?: string;
 } {
   try {
-    const normalized = normalizePath(testPath);
+    const normalized = normalizePath(testPath, isDirectory);
     return {
       isValid: true,
       normalized
@@ -112,6 +113,7 @@ export function validatePathEdgeCases(testPath: string): {
   } catch (error) {
     return {
       isValid: false,
+      indicatesDirectory: pathIndicatesDirectory(testPath),
       error: error instanceof Error ? error.message : 'Unknown error'
     };
   }
