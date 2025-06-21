@@ -23,13 +23,36 @@ WTTP Site provides a powerful set of smart contracts that act as a decentralized
 
 Get your first on-chain website live in minutes.
 
-### 1. Install and Configure the Hardhat Extension
+#### 1. Clone and Set Up the Repository (Preferred Method)
+
+To get started quickly with minimal setup, clone this repository and use the pre-configured setup:
+
+```bash
+# Clone the repository
+git clone https://github.com/TechnicallyWeb3/wttp-site.git
+```
+
+```bash
+# Navigate into the project directory
+cd wttp-site
+```
+
+```bash
+# Install dependencies
+npm install
+```
+
+This method is the easiest and fastest way to get your on-chain website live without manually configuring the Hardhat extension or installing the package separately. Once dependencies are installed, you can immediately proceed to running a local Hardhat node and deploying your site.
+
+---
+
+The previous instructions for installing and configuring the npm package remain available as an alternative method for advanced users or custom setups.
 
 ```bash
 npm install @wttp/site
 ```
 
-To use this as a hardhat package (recommended) you should import this package into your hardhat config file. 
+To use this as a hardhat package you should import this package into your hardhat config file. 
 
 ```typescript
 // hardhat.config.ts
