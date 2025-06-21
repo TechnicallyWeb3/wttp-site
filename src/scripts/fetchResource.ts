@@ -36,7 +36,7 @@ export async function fetchResource(
   }
 
   try {
-    path = normalizePath(path || "/", undefined, false); // forces absolute path
+    path = normalizePath(path || "/"); // should force absolute path, doesn't
   } catch (error) {
     throw new Error(`Invalid path format: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
@@ -172,7 +172,7 @@ export async function readDataPointsContent(
   console.log(`🔗 Loading DPS at address ${dpsAddress}...`);
   
   // Get the DPS contract
-  const dpsContract = await ethers.getContractAt("IDataPointStorage", dpsAddress);
+  const dpsContract = await ethers.getContractAt("@tw3/esp/contracts/interfaces/IDataPointStorage.sol:IDataPointStorage", dpsAddress);
   
   // Read all datapoints and combine their content with progress reporting
   const contents: Uint8Array[] = [];
