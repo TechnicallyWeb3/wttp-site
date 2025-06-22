@@ -24,3 +24,5 @@ ignition/deployments/chain-31337
 /backup
 # some working files we don't need to keep
 /agent-files
+
+/hex-2048

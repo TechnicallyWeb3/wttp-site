@@ -2,10 +2,12 @@ import { ethers } from "hardhat";
 import fs from "fs";
 import path from "path";
 import { 
+  encodeCharset,
   encodeMimeType, 
   IBaseWTTPSite, 
   LOCATEResponseStruct, 
-  MimeType 
+  MimeType,
+  Charset
 } from "@wttp/core";
 import mime from "mime-types";
 import { fetchResource } from "./fetchResource";
@@ -224,9 +226,10 @@ export async function uploadFile(
 
     
   // Get MIME type
-  const mimeType = getMimeType(sourcePath).split("; charset=")[0];
+  const mimeType = getMimeType(sourcePath).split("; charset=");
   // const charset = mimeType.split("; charset=")[1] || "utf-8";
-  const mimeTypeBytes2 = encodeMimeType(mimeType as MimeType);
+  const mimeTypeBytes2 = encodeMimeType(mimeType[0]);
+  const charsetBytes2 = encodeCharset(mimeType[1]);
 
   // Gas optimization settings for faster transactions
   const gasSettings = await getDynamicGasSettings();
@@ -243,7 +246,7 @@ export async function uploadFile(
     head: headRequest,
     properties: {
       mimeType: mimeTypeBytes2,
-      charset: "0x7508", // u8 = utf-8
+      charset: charsetBytes2,
       encoding: "0x6964", // id = identity
       language: "0x6575" // eu = english-US
     },

@@ -1,5 +1,5 @@
 import { task } from "hardhat/config";
-import { IBaseWTTPSite, RangeStruct } from "@wttp/core";
+import { decodeCharset, decodeEncoding, decodeLanguage, decodeMimeType, IBaseWTTPSite, RangeStruct } from "@wttp/core";
 import { loadContract } from "@tw3/esp";
 
 task("site:fetch", "Fetch a resource from a WTTP site via the WTTPGateway")
@@ -28,7 +28,6 @@ task("site:fetch", "Fetch a resource from a WTTP site via the WTTPGateway")
     }
 
     const { fetchResource, isText } = require("../scripts/fetchResource");
-    const { bytes2ToMimeType } = require("../scripts/uploadFile");
     const { site, path, range, ifModifiedSince, ifNoneMatch, head, datapoints } = taskArgs;
     
     // Parse range if provided
@@ -85,10 +84,11 @@ task("site:fetch", "Fetch a resource from a WTTP site via the WTTPGateway")
       }
     }
 
-    console.log(`Content-Type: ${bytes2ToMimeType(mimeTypeBytes)}`);
-    console.log(`Charset: ${metadata.properties.charset}`);
-    console.log(`Encoding: ${metadata.properties.encoding}`);
-    console.log(`Language: ${metadata.properties.language}`);
+    console.log(`Content-Type: ${decodeMimeType(mimeTypeBytes)}`);
+    console.log(`CharsetBytes: ${metadata.properties.charset}`);
+    console.log(`Charset: ${decodeCharset(metadata.properties.charset)}`);
+    console.log(`Encoding: ${decodeEncoding(metadata.properties.encoding)}`);
+    console.log(`Language: ${decodeLanguage(metadata.properties.language)}`);
     console.log(`Size: ${metadata.size} bytes`);
     console.log(`Version: ${metadata.version}`); 
     console.log(`ETag: ${resource.response.head.etag}`);
