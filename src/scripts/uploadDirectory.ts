@@ -1,11 +1,10 @@
 import { ethers } from "hardhat";
 import fs from "fs";
 import path from "path";
-import { IBaseWTTPSite, READ_ONLY_PUBLIC_HEADER } from "@wttp/core";
-import { getMimeType, mimeTypeToBytes2 } from "./uploadFile";
-import { uploadFile } from "./uploadFile";
-import { DEFINERequestStruct, HEADRequestStruct } from "@wttp/core";
+import { IBaseWTTPSite, READ_ONLY_PUBLIC_HEADER, DEFINERequestStruct, HEADRequestStruct } from "@wttp/core";
+import { getMimeType, uploadFile, getDynamicGasSettings, looseEqual } from "./uploadFile";
 import { normalizePath } from "./pathUtils";
+import { fetchResource } from "./fetchResource";
 
 const MAX_CHUNK_SIZE = 32 * 1024;
 
@@ -101,8 +100,6 @@ function createDirectoryMetadata(dirPath: string, basePath: string): Record<stri
   return { "directory": directoryMetadata };
 }
 
-
-
 // Main upload directory function with enhanced error handling and validation
 export async function uploadDirectory(
   wttpSite: IBaseWTTPSite,
@@ -150,29 +147,97 @@ export async function uploadDirectory(
     }
   }
   
-  // Upload the directory metadata with redirect header
-  console.log("Uploading directory metadata with redirect header...");
-  
-  let requestHead: HEADRequestStruct = {
-    path: destinationPath,
-    ifModifiedSince: 0,
-    ifNoneMatch: ethers.ZeroHash
-  };
-
-  const defineRequest: DEFINERequestStruct = {
-    head: requestHead,
-    data: {
-      ...READ_ONLY_PUBLIC_HEADER,
-      redirect: {
-        code: redirectCode,
-        location: indexLocation
-      }
+  // Check if the directory already has a header and if it's different from what we want to set
+  const newHeaderData = {
+    ...READ_ONLY_PUBLIC_HEADER,
+    redirect: {
+      code: redirectCode,
+      location: indexLocation
     }
   };
+
+  let shouldDefine = true;
+  try {
+    const siteAddress = await wttpSite.getAddress();
+    const existingResource = await fetchResource(siteAddress, destinationPath, { headRequest: true });
     
-  const defineTx = await wttpSite.DEFINE(defineRequest);
-  await defineTx.wait();
-  console.log(`Directory ${destinationPath} created successfully!`);
+    if (existingResource.response.head.status !== 404n) {
+      // Resource exists, compare headers
+      // const existingHeaderData = existingResource.response.head.headerInfo;
+      
+      // // Convert BigInt values to numbers for comparison
+      // const normalizedExisting = {
+      //   cache: {
+      //     immutableFlag: existingHeaderData.cache.immutableFlag,
+      //     preset: Number(existingHeaderData.cache.preset),
+      //     custom: existingHeaderData.cache.custom
+      //   },
+      //   cors: {
+      //     methods: Number(existingHeaderData.cors.methods),
+      //     origins: existingHeaderData.cors.origins,
+      //     preset: Number(existingHeaderData.cors.preset),
+      //     custom: existingHeaderData.cors.custom
+      //   },
+      //   redirect: {
+      //     code: Number(existingHeaderData.redirect.code),
+      //     location: existingHeaderData.redirect.location
+      //   }
+      // };
+
+      // const normalizedNew = {
+      //   cache: {
+      //     immutableFlag: newHeaderData.cache.immutableFlag,
+      //     preset: Number(newHeaderData.cache.preset),
+      //     custom: newHeaderData.cache.custom
+      //   },
+      //   cors: {
+      //     methods: Number(newHeaderData.cors.methods),
+      //     origins: newHeaderData.cors.origins,
+      //     preset: Number(newHeaderData.cors.preset),
+      //     custom: newHeaderData.cors.custom
+      //   },
+      //   redirect: {
+      //     code: Number(newHeaderData.redirect.code),
+      //     location: newHeaderData.redirect.location
+      //   }
+      // };
+
+      if (looseEqual(existingResource.response.head.headerInfo, newHeaderData)) {
+        console.log(`📋 Directory header at ${destinationPath} is already up to date, skipping DEFINE`);
+        shouldDefine = false;
+      } else {
+        console.log(`📋 Directory header at ${destinationPath} is different, will update with DEFINE`);
+      }
+    } else {
+      console.log(`📋 Directory ${destinationPath} does not exist, will create with DEFINE`);
+    }
+  } catch (error) {
+    console.log(`📋 Could not check existing header for ${destinationPath}, proceeding with DEFINE: ${error}`);
+  }
+
+  if (shouldDefine) {
+    // Upload the directory metadata with redirect header
+    console.log("Uploading directory metadata with redirect header...");
+    
+    // Get dynamic gas settings for optimized transaction speed
+    const gasSettings = await getDynamicGasSettings();
+    
+    let requestHead: HEADRequestStruct = {
+      path: destinationPath,
+      ifModifiedSince: 0,
+      ifNoneMatch: ethers.ZeroHash
+    };
+
+    const defineRequest: DEFINERequestStruct = {
+      head: requestHead,
+      data: newHeaderData
+    };
+      
+    console.log(`🚀 Sending DEFINE transaction with optimized gas settings...`);
+    const defineTx = await wttpSite.DEFINE(defineRequest, gasSettings);
+    await defineTx.wait();
+    console.log(`Directory ${destinationPath} created successfully!`);
+  }
   
   // Clean up the temporary file
   if (tempMetadataPath) {

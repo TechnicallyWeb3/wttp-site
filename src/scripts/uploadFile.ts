@@ -1,7 +1,14 @@
 import { ethers } from "hardhat";
 import fs from "fs";
 import path from "path";
-import { IBaseWTTPSite, LOCATEResponseStruct } from "@wttp/core";
+import { 
+  encodeCharset,
+  encodeMimeType, 
+  IBaseWTTPSite, 
+  LOCATEResponseStruct, 
+  MimeType,
+  Charset
+} from "@wttp/core";
 import mime from "mime-types";
 import { fetchResource } from "./fetchResource";
 import { normalizePath } from "./pathUtils";
@@ -10,6 +17,31 @@ import { normalizePath } from "./pathUtils";
 const CHUNK_SIZE = 32 * 1024; // 32KB chunks
 const WTTP_FILE_WARN = 100 * 1024 * 1024; // 100MB warning
 const WTTP_FILE_LIMIT = 400 * 1024 * 1024; // 400MB limit
+
+// Helper function to loosely compare two objects
+export function looseEqual(obj1: any, obj2: any): boolean {
+  if (obj1 === obj2) return true;
+  
+  if (obj1 == null || obj2 == null) return false;
+  
+  const values1: any[] = Object.values(obj1);
+  const values2: any[] = Object.values(obj2);
+  
+  if (values1.length !== values2.length) return false;
+  
+  for (let i = 0; i < values1.length; i++) {
+    if (
+      typeof values1[i] === 'object' ||
+      typeof values2[i] === 'object'
+    ) {
+      if(!looseEqual(values1[i], values2[i])) return false;
+    } else {
+      if (values1[i].toString() != values2[i].toString()) return false;
+    }
+  }
+  
+  return true;
+}
 
 // Helper function to chunk file data
 function chunkData(data: Buffer, chunkSize: number): Buffer[] {
@@ -32,59 +64,53 @@ export function getMimeType(filePath: string): string {
   return mimeType ? mimeType.toString() : "application/octet-stream";
 }
 
-// Helper function to convert MIME type to bytes2
-export function mimeTypeToBytes2(mimeType: string): string {
-  // Map MIME types to 2-byte identifiers using 1-letter codes
-  const mimeTypeMap: Record<string, string> = {
-    'text/html': '0x7468', // th
-    'text/javascript': '0x616a', // aj (defaults to application/javascript)
-    'text/css': '0x7463', // tc 
-    'text/markdown': '0x746d', // tm
-    'text/plain': '0x7470', // tp
-    'application/javascript': '0x616a', // aj
-    'application/xml': '0x6178', // ax
-    'application/pdf': '0x6170', // ap
-    'application/json': '0x616f', // ao (object)
-    'image/png': '0x6970', // ip
-    'image/jpeg': '0x696a', // ij
-    'image/gif': '0x6967', // ig
-    'image/svg+xml': '0x6973', // is
-    'image/webp': '0x6977', // iw
-    'image/x-icon': '0x6969', // ii
-    'font/ttf': '0x6674', // ft
-    'font/otf': '0x666f', // fo
-    'font/woff': '0x6677', // fw
-    'font/woff2': '0x6632', // f2
-    'application/octet-stream': '0x6273' // bs (binary stream)
-  };
-  return mimeTypeMap[mimeType] || '0x6273'; // Default to binary stream
-}
-
-export function bytes2ToMimeType(bytes2Value: string): string {
-  // Map 2-byte identifiers back to MIME types
-  const bytes2ToMimeMap: Record<string, string> = {
-    '0x7468': 'text/html',                // th
-    '0x616a': 'application/javascript',   // aj
-    '0x7463': 'text/css',                 // tc
-    '0x746d': 'text/markdown',            // tm
-    '0x7470': 'text/plain',               // tp
-    '0x6178': 'application/xml',          // ax
-    '0x6170': 'application/pdf',          // ap
-    '0x616f': 'application/json',         // ao
-    '0x6970': 'image/png',                // ip
-    '0x696a': 'image/jpeg',               // ij
-    '0x6967': 'image/gif',                // ig
-    '0x6973': 'image/svg+xml',            // is
-    '0x6977': 'image/webp',               // iw
-    '0x6969': 'image/x-icon',             // ii
-    '0x6674': 'font/ttf',                 // ft
-    '0x666f': 'font/otf',                 // fo
-    '0x6677': 'font/woff',                // fw
-    '0x6632': 'font/woff2',               // f2
-    '0x6273': 'application/octet-stream'  // bs
-  };
-  
-  return bytes2ToMimeMap[bytes2Value] || 'application/octet-stream'; // Default to binary stream
+// Helper function to get dynamic gas settings based on current network conditions
+export async function getDynamicGasSettings() {
+  try {
+    // Get current network fee data
+    const feeData = await ethers.provider.getFeeData();
+    console.log(`🔍 Current network gas prices - Max Fee: ${feeData.maxFeePerGas ? ethers.formatUnits(feeData.maxFeePerGas, "gwei") : "N/A"} gwei, Priority Fee: ${feeData.maxPriorityFeePerGas ? ethers.formatUnits(feeData.maxPriorityFeePerGas, "gwei") : "N/A"} gwei`);
+    
+    // Apply 25% buffer for faster confirmation
+    const bufferMultiplier = 1.25;
+    
+    let maxFeePerGas: bigint;
+    let maxPriorityFeePerGas: bigint;
+    
+    if (feeData.maxFeePerGas && feeData.maxPriorityFeePerGas) {
+      // EIP-1559 network (Ethereum mainnet, etc.)
+      maxFeePerGas = BigInt(Math.floor(Number(feeData.maxFeePerGas) * bufferMultiplier));
+      maxPriorityFeePerGas = BigInt(Math.floor(Number(feeData.maxPriorityFeePerGas) * bufferMultiplier));
+    } else if (feeData.gasPrice) {
+      // Legacy network pricing
+      const bufferedGasPrice = BigInt(Math.floor(Number(feeData.gasPrice) * bufferMultiplier));
+      maxFeePerGas = bufferedGasPrice;
+      maxPriorityFeePerGas = ethers.parseUnits("2", "gwei"); // Minimum tip
+    } else {
+      // Fallback to reasonable defaults with buffer
+      console.warn("⚠️ Could not fetch network gas prices, using fallback values");
+      maxFeePerGas = ethers.parseUnits("62.5", "gwei"); // 50 * 1.25
+      maxPriorityFeePerGas = ethers.parseUnits("2.5", "gwei"); // 2 * 1.25
+    }
+    
+    const gasSettings = {
+      // Let ethers.js estimate gasLimit automatically for each transaction
+      maxFeePerGas,
+      maxPriorityFeePerGas
+    };
+    
+    console.log(`⚡ Optimized gas settings - Max Fee: ${ethers.formatUnits(maxFeePerGas, "gwei")} gwei, Priority Fee: ${ethers.formatUnits(maxPriorityFeePerGas, "gwei")} gwei (25% buffer applied)`);
+    
+    return gasSettings;
+  } catch (error) {
+    console.error("❌ Error fetching gas prices:", error);
+    // Fallback to reasonable defaults
+    return {
+      // Let ethers.js estimate gasLimit automatically
+      maxFeePerGas: ethers.parseUnits("50", "gwei"),
+      maxPriorityFeePerGas: ethers.parseUnits("2", "gwei")
+    };
+  }
 }
 
 // Main upload function with enhanced error handling and validation
@@ -200,9 +226,13 @@ export async function uploadFile(
 
     
   // Get MIME type
-  const mimeType = getMimeType(sourcePath).split("; charset=")[0];
+  const mimeType = getMimeType(sourcePath).split("; charset=");
   // const charset = mimeType.split("; charset=")[1] || "utf-8";
-  const mimeTypeBytes2 = mimeTypeToBytes2(mimeType);
+  const mimeTypeBytes2 = encodeMimeType(mimeType[0]);
+  const charsetBytes2 = encodeCharset(mimeType[1]);
+
+  // Gas optimization settings for faster transactions
+  const gasSettings = await getDynamicGasSettings();
 
   const headRequest = {
     path: destinationPath,
@@ -216,14 +246,32 @@ export async function uploadFile(
     head: headRequest,
     properties: {
       mimeType: mimeTypeBytes2,
-      charset: "0x7556", // u8 = utf-8
+      charset: charsetBytes2,
       encoding: "0x6964", // id = identity
       language: "0x6575" // eu = english-US
     },
     data: [dataRegistrations[0]]
   };
+
+  // compare properties against head.metadata.properties
+  const response = await fetchResource(await wttpSite.getAddress(), destinationPath);
+  if (looseEqual(response.response.head.metadata.properties, putRequest.properties)) {
+    // check if data is the same
+    if (Buffer.compare(ethers.getBytes(response.content || "0x"), fileData) === 0) {
+      console.log("File data is the same, skipping upload");
+      return response;
+    }
+  }
+  // if (head.response.head.metadata.properties.mimeType !== mimeTypeBytes2) {
+  //   throw new Error(`Mime type mismatch: ${head.response.head.metadata.properties.mimeType} !== ${mimeTypeBytes2}`);
+  // }
+  // if (head.response.head.metadata.properties.charset !== "0x7508") {
     
-  const tx = await wttpSite.PUT(putRequest, { value: royalty[0] });
+  console.log(`🚀 Sending PUT transaction with optimized gas settings...`);
+  const tx = await wttpSite.PUT(putRequest, { 
+    value: royalty[0],
+    ...gasSettings // TODO: Uncomment this when gas settings are working
+  });
   await tx.wait();
   console.log("File created successfully!");
 
@@ -232,12 +280,19 @@ export async function uploadFile(
     console.log(`📤 Uploading chunk ${i + 1}/${dataRegistrations.length} (${Math.round((i + 1) / dataRegistrations.length * 100)}%)`);
     
     try {
+      // Get fresh gas settings for each chunk to adapt to network conditions
+      const currentGasSettings = await getDynamicGasSettings();
+      
       const patchRequest = {
         head: headRequest,
         data: [dataRegistrations[i]]
       };
     
-      const tx = await wttpSite.PATCH(patchRequest, { value: royalty[i] });
+      console.log(`🚀 Sending PATCH transaction ${i + 1} with updated gas settings...`);
+      const tx = await wttpSite.PATCH(patchRequest, { 
+        value: royalty[i],
+        ...currentGasSettings // TODO: Uncomment this when gas settings are working
+      });
       await tx.wait();
       console.log(`✅ Chunk ${i + 1} uploaded successfully (${ethers.formatEther(royalty[i])} ETH)`);
     } catch (error) {

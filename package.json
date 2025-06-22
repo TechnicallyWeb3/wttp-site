@@ -94,7 +94,7 @@
     "shx": "^0.3.4"
   },
   "dependencies": {
-    "@wttp/core": "^0.4.11",
+    "@wttp/core": "^0.4.13",
     "hardhat": "^2.24.2"
   }
 }
