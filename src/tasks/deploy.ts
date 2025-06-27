@@ -470,7 +470,7 @@ async function deployOrLoadTestEsp(hre: HardhatRuntimeEnvironment, deploymentArg
         const dpsAbi = DataPointStorage__factory.abi as any;
         const dpsBytecode = DataPointStorage__factory.bytecode;
         if (!signer) {
-          dpsFactory = new DataPointStorage__factory()
+          dpsFactory = await hre.ethers.getContractFactory(dpsAbi, dpsBytecode);
         } else {
           dpsFactory = await hre.ethers.getContractFactory(dpsAbi, dpsBytecode, signer);
         }
@@ -502,10 +502,6 @@ async function deployOrLoadTestEsp(hre: HardhatRuntimeEnvironment, deploymentArg
       console.log(dprAddress);
       console.log(`📍 Using test DPR(temporary deployment): ${dprAddress}`);
       return dprAddress;
-    // } catch (error) {
-      console.log(`📍 Using mock DPR(no deployment): 0x0000000000000000000000000000000000000001`);
-      return "0x0000000000000000000000000000000000000001";
-    // }
   }
 
 }
