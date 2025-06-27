@@ -2,9 +2,15 @@
 // but allow direct import from ethers package when imported
 
 import { ethers } from "hardhat";
-import { HEADRequestStruct, ORIGINS_ADMIN_ONLY, type HEADResponseStruct, type IBaseWTTPSite, type LOCATEResponseStruct, type RangeStruct } from "@wttp/core";
-import { normalizePath } from "./pathUtils";
-// import { getContractAddress } from "@tw3/esp";
+import { 
+  HEADRequestStruct, 
+  ORIGINS_ADMIN_ONLY, 
+  type HEADResponseStruct, 
+  type IBaseWTTPSite, 
+  type LOCATEResponseStruct, 
+  type RangeStruct,
+  normalizePath
+} from "@wttp/core";
 
 /**
  * Fetches a resource directly from a WTTP site contract

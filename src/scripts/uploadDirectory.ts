@@ -1,9 +1,14 @@
 import { ethers } from "hardhat";
 import fs from "fs";
 import path from "path";
-import { IBaseWTTPSite, READ_ONLY_PUBLIC_HEADER, DEFINERequestStruct, HEADRequestStruct } from "@wttp/core";
+import { 
+  IBaseWTTPSite, 
+  DEFAULT_HEADER, 
+  DEFINERequestStruct, 
+  HEADRequestStruct, 
+  normalizePath 
+} from "@wttp/core";
 import { getMimeType, uploadFile, getDynamicGasSettings, looseEqual } from "./uploadFile";
-import { normalizePath } from "./pathUtils";
 import { fetchResource } from "./fetchResource";
 
 const MAX_CHUNK_SIZE = 32 * 1024;
@@ -149,7 +154,7 @@ export async function uploadDirectory(
   
   // Check if the directory already has a header and if it's different from what we want to set
   const newHeaderData = {
-    ...READ_ONLY_PUBLIC_HEADER,
+    ...DEFAULT_HEADER,
     redirect: {
       code: redirectCode,
       location: indexLocation

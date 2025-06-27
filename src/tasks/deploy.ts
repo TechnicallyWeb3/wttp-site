@@ -1,5 +1,5 @@
 import { DataPointStorage__factory, DataPointRegistry__factory } from "@tw3/esp";
-import { ALL_METHODS_BITMASK, ORIGINS_PUBLIC, PUBLIC_HEADER } from "@wttp/core";
+import { DEFAULT_HEADER } from "@wttp/core";
 import { task, types } from "hardhat/config";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
@@ -73,7 +73,7 @@ task("site:deploy", "Deploy a single Web3Site contract with funding checks")
       }
 
       // Create default header - fixed to match contract requirements
-      const defaultHeader = PUBLIC_HEADER;
+      const defaultHeader = DEFAULT_HEADER;
 
       console.log(`⚙️  Cache preset: ${cachePreset}`);
 
@@ -232,83 +232,83 @@ task("site:deploy", "Deploy a single Web3Site contract with funding checks")
     }
   });
 
-task("site:multichain", "Deploy Web3Site contracts across multiple chains")
-  .addParam(
-    "chains",
-    "Comma-separated list of chain IDs (e.g., '11155111,80002')",
-    undefined,
-    types.string
-  )
-  .addOptionalParam(
-    "dprAddresses",
-    "JSON object with DPR addresses per chain (e.g., '{\"11155111\":\"0x...\",\"80002\":\"0x...\"}')",
-    undefined,
-    types.string
-  )
-  .addOptionalParam(
-    "cachePreset",
-    "Cache preset (0=NONE, 1=NO_CACHE, 2=DEFAULT, 3=SHORT, 4=MEDIUM, 5=LONG, 6=PERMANENT)",
-    "3",
-    types.int
-  )
-  .addFlag(
-    "skipVerify",
-    "Skip contract verification on block explorer"
-  )
-  .setAction(async (taskArgs, hre) => {
-    console.log(`🚀 Multi-Chain Web3Site Deployment Task\n`);
+// task("site:multichain", "Deploy Web3Site contracts across multiple chains")
+//   .addParam(
+//     "chains",
+//     "Comma-separated list of chain IDs (e.g., '11155111,80002')",
+//     undefined,
+//     types.string
+//   )
+//   .addOptionalParam(
+//     "dprAddresses",
+//     "JSON object with DPR addresses per chain (e.g., '{\"11155111\":\"0x...\",\"80002\":\"0x...\"}')",
+//     undefined,
+//     types.string
+//   )
+//   .addOptionalParam(
+//     "cachePreset",
+//     "Cache preset (0=NONE, 1=NO_CACHE, 2=DEFAULT, 3=SHORT, 4=MEDIUM, 5=LONG, 6=PERMANENT)",
+//     "3",
+//     types.int
+//   )
+//   .addFlag(
+//     "skipVerify",
+//     "Skip contract verification on block explorer"
+//   )
+//   .setAction(async (taskArgs, hre) => {
+//     console.log(`🚀 Multi-Chain Web3Site Deployment Task\n`);
 
-    const { chains, dprAddresses, cachePreset, skipVerify } = taskArgs;
+//     const { chains, dprAddresses, cachePreset, skipVerify } = taskArgs;
 
-    try {
-      // Parse chain IDs
-      const chainIds = chains.split(',').map((id: string) => parseInt(id.trim()));
-      console.log(`🌐 Target chains: ${chainIds.join(', ')}`);
+//     try {
+//       // Parse chain IDs
+//       const chainIds = chains.split(',').map((id: string) => parseInt(id.trim()));
+//       console.log(`🌐 Target chains: ${chainIds.join(', ')}`);
 
-      // Parse custom DPR addresses if provided
-      let customDprAddresses: Record<number, string> | undefined;
-      if (dprAddresses) {
-        customDprAddresses = JSON.parse(dprAddresses);
-        console.log(`📍 Custom DPR addresses:`, customDprAddresses);
-      }
+//       // Parse custom DPR addresses if provided
+//       let customDprAddresses: Record<number, string> | undefined;
+//       if (dprAddresses) {
+//         customDprAddresses = JSON.parse(dprAddresses);
+//         console.log(`📍 Custom DPR addresses:`, customDprAddresses);
+//       }
 
-      // Create custom header - updated to new structure
-      const customHeader = {
-        cache: {
-          immutableFlag: false,
-          preset: cachePreset,
-          custom: ""
-        },
-        cors: {
-          methods: 511,
-          origins: [],
-          preset: 1, // PUBLIC preset
-          custom: ""
-        },
-        redirect: {
-          code: 0,
-          location: ""
-        }
-      };
+//       // Create custom header - updated to new structure
+//       const customHeader = {
+//         cache: {
+//           immutableFlag: false,
+//           preset: cachePreset,
+//           custom: ""
+//         },
+//         cors: {
+//           methods: 511,
+//           origins: [],
+//           preset: 1, // PUBLIC preset
+//           custom: ""
+//         },
+//         redirect: {
+//           code: 0,
+//           location: ""
+//         }
+//       };
 
-      // Import and run multi-chain deployment
-      const { deployWeb3SiteMultiChain } = await import("../scripts/DeployMultiChain");
+//       // Import and run multi-chain deployment
+//       const { deployWeb3SiteMultiChain } = await import("../scripts/DeployMultiChain");
       
-      const result = await deployWeb3SiteMultiChain(
-        chainIds,
-        customDprAddresses,
-        customHeader,
-        skipVerify
-      );
+//       const result = await deployWeb3SiteMultiChain(
+//         chainIds,
+//         customDprAddresses,
+//         customHeader,
+//         skipVerify
+//       );
 
-      console.log("\n🎉 Multi-Chain Deployment Complete!");
-      return result;
+//       console.log("\n🎉 Multi-Chain Deployment Complete!");
+//       return result;
 
-    } catch (error) {
-      console.error("❌ Multi-chain deployment failed:", error);
-      process.exit(1);
-    }
-  });
+//     } catch (error) {
+//       console.error("❌ Multi-chain deployment failed:", error);
+//       process.exit(1);
+//     }
+//   });
 
 task("site:verify", "Verify deployed Web3Site contract")
   .addParam("address", "Web3Site contract address", undefined, types.string)
@@ -343,7 +343,7 @@ task("site:verify", "Verify deployed Web3Site contract")
     console.log(`📍 DPR: ${dpr}`);
 
     // Create header with same logic as deployment task
-    const defaultHeader = { ...PUBLIC_HEADER };
+    const defaultHeader = { ...DEFAULT_HEADER };
 
     // Named cache preset support
     const cachePresets: { [key: string]: number } = { 

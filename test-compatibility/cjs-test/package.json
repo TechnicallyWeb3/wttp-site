@@ -1,0 +1,15 @@
+{
+  "name": "cjs-test",
+  "version": "1.0.0",
+  "description": "testing the import of cjs build",
+  "main": "index.js",
+  "scripts": {
+    "test": "node index.js",
+    "test:imports": "node test-imports.js"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "wttp-site": "file:../../"
+  }
+} 

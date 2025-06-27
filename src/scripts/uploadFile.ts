@@ -6,12 +6,10 @@ import {
   encodeMimeType, 
   IBaseWTTPSite, 
   LOCATEResponseStruct, 
-  MimeType,
-  Charset
+  normalizePath
 } from "@wttp/core";
 import mime from "mime-types";
 import { fetchResource } from "./fetchResource";
-import { normalizePath } from "./pathUtils";
 
 // Constants
 const CHUNK_SIZE = 32 * 1024; // 32KB chunks

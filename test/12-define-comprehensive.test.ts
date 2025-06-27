@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { TestWTTPSite } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import { normalizePath } from "../src/scripts/pathUtils";
+import { normalizePath } from "@wttp/core";
 
 describe("🔧 DEFINE Method - Comprehensive Testing", function () {
   let testWTTPSite: TestWTTPSite;
