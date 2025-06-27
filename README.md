@@ -42,7 +42,12 @@ cd wttp-site
 npm install
 ```
 
-This method is the easiest and fastest way to get your on-chain website live without manually configuring the Hardhat extension or installing the package separately. Once dependencies are installed, you can immediately proceed to running a local Hardhat node and deploying your site.
+```bash
+# Compile the smart contracts
+npx hardhat compile
+```
+
+This method is the easiest and fastest way to get your on-chain website live without manually configuring the Hardhat extension or installing the package separately. Once dependencies are installed and contracts are compiled, you can immediately proceed to running a local Hardhat node and deploying your site.
 
 ---
 
@@ -164,6 +169,69 @@ Or lookup a resource such as:
 # The --path parameter is the path of the resource you're looking for, / if empty
 npx hardhat site:fetch --site 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9 --path /index.html --network localhost
 ```
+
+### 6. Environment Configuration (Optional)
+
+For deploying to live networks and contract verification, you'll need to set up environment variables. Create a `.env` file in the project root:
+
+```bash
+# Create .env file from template (if available)
+cp .env.template .env
+```
+
+Then configure the following variables in your `.env` file:
+
+```bash
+# Your wallet mnemonic (12-24 word phrase) - KEEP THIS SECURE!
+OWNER_MNEMONIC="your twelve word mnemonic phrase here for deployment wallet"
+
+# Etherscan API key for contract verification on Ethereum networks
+ETHERSCAN_API_KEY="your_etherscan_api_key_here"
+
+# PolygonScan API key for contract verification on Polygon network
+POLYGONSCAN_API_KEY="your_polygonscan_api_key_here"
+```
+
+**Security Note**: Never commit your `.env` file to version control. The `.gitignore` file already excludes it by default.
+
+**Getting API Keys**:
+- **Etherscan API**: Register at [etherscan.io](https://etherscan.io/apis) and create a free API key
+- **PolygonScan API**: Register at [polygonscan.com](https://polygonscan.com/apis) and create a free API key
+
+### 7. Supported Networks
+
+WTTP Site supports deployment to the following networks:
+
+| Network | Chain ID | Network Flag | Description |
+| :--- | :--- | :--- | :--- |
+| **Localhost** | 31337 | `--network localhost` | Local Hardhat development network |
+| **Sepolia** | 11155111 | `--network sepolia` | Ethereum testnet - free ETH from faucets |
+| **Polygon** | 137 | `--network polygon` | Polygon mainnet - low-cost transactions |
+
+**Example deployment to Sepolia testnet**:
+```bash
+npx hardhat site:deploy --network sepolia
+```
+
+**Example deployment to Polygon mainnet**:
+```bash
+npx hardhat site:deploy --network polygon
+```
+
+**Note**: For testnet deployments (Sepolia), you can get free test ETH from faucets like [sepoliafaucet.com](https://sepoliafaucet.com). For Polygon mainnet, you'll need real MATIC tokens.
+
+#### Infrastructure Addresses
+
+WTTP Site uses the following infrastructure contracts (same addresses across all supported chains):
+
+| Contract | Address | Description |
+| :--- | :--- | :--- |
+| **DPS** | `0xDA7Adb41ac559e689fE170aE4f2853a450e6E4Cc` | DataPointStorage - handles on-chain data storage |
+| **DPR** | `0xDA7Ae59Fa1DB9B138dddaaFB6153B11B162Cfd8B` | DataPointRegistry - manages data point registration |
+| **WTTPGateway** | `0x6A7E6a45573D9E51D53413B25399311B0df42687` | WTTP Gateway - provides HTTP-like interface |
+
+These are vanity addresses deployed consistently across Localhost, Sepolia, and Polygon networks.
+
 ---
 
 ## ⚙️ Easy Configuration with Presets

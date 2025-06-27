@@ -41,6 +41,14 @@ const config: HardhatUserConfig = {
         count: 20
       },
     },
+    polygon: {
+      chainId: 137,
+      url: "https://polygon-bor-rpc.publicnode.com",
+      accounts: {
+        mnemonic: mnemonic,
+        count: 20
+      },
+    },
   },
   etherscan: {
     apiKey: {
