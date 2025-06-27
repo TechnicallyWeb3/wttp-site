@@ -470,7 +470,7 @@ async function deployOrLoadTestEsp(hre: HardhatRuntimeEnvironment, deploymentArg
         const dpsAbi = DataPointStorage__factory.abi as any;
         const dpsBytecode = DataPointStorage__factory.bytecode;
         if (!signer) {
-          dpsFactory = await hre.ethers.getContractFactory(dpsAbi, dpsBytecode);
+          dpsFactory = new DataPointStorage__factory()
         } else {
           dpsFactory = await hre.ethers.getContractFactory(dpsAbi, dpsBytecode, signer);
         }
