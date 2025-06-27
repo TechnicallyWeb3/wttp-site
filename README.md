@@ -44,7 +44,7 @@ npm install
 
 ```bash
 # Compile the smart contracts
-npx hardhat compile
+npm run compile
 ```
 
 This method is the easiest and fastest way to get your on-chain website live without manually configuring the Hardhat extension or installing the package separately. Once dependencies are installed and contracts are compiled, you can immediately proceed to running a local Hardhat node and deploying your site.
@@ -276,6 +276,51 @@ For in-depth guides, tutorials, and advanced use cases, please visit our full do
 - **[User Guides](./docs/user-guide/)**: Learn about the core concepts, contract architecture, and blockchain basics.
 - **[Tutorials](./docs/tutorials/)**: Follow step-by-step instructions for common tasks like uploading sites and managing permissions.
 - **[Examples](./docs/examples/)**: Explore complete, working examples for static sites, blogs, file storage, and more.
+
+## 🛡️ File Filtering with `.wttpignore`
+
+WTTP automatically protects you from accidentally uploading sensitive files to the blockchain. When uploading directories, the system uses gitignore-style patterns to filter out files that shouldn't be deployed on-chain.
+
+### Automatically Ignored Files
+
+The following files and directories are **automatically ignored** for security:
+
+- **Version Control**: `.git/`, `.gitignore`, `.gitattributes`
+- **Environment Files**: `.env`, `.env.*` (API keys, secrets, etc.)
+- **Dependencies**: `node_modules/`, `.npm/`, `.yarn/`
+- **Editor Files**: `.vscode/`, `.idea/`, `*.swp`, `*.swo`, `*~`
+- **System Files**: `.DS_Store`, `Thumbs.db`, `desktop.ini`
+- **Temporary Files**: `.cache/`, `.temp/`, `.tmp/`, `*.log`
+- **WTTP Files**: `*.wttpignore`
+
+### Custom Ignore Patterns
+
+Create a `.wttpignore` file in your project root to add custom patterns:
+
+```bash
+# Custom ignore patterns
+secrets/
+*.key
+draft-*
+temp-*
+
+# Negation: include specific files even if they match other patterns
+!important.md
+!dist/production.js
+```
+
+The `.wttpignore` file uses the same syntax as `.gitignore`. See the included [`.wttpignore`](./.wttpignore) file for comprehensive examples.
+
+### Disable Protection (⚠️ Not Recommended)
+
+```bash
+# WARNING: This disables default protections and could expose sensitive data
+npx hardhat site:upload --site YOUR_SITE --source ./my-website --nodefaults true --network localhost
+```
+
+**Always test uploads on a local network first** to ensure no sensitive data is accidentally included.
+
+---
 
 ## 📄 License
 

@@ -10,6 +10,7 @@ import {
 } from "@wttp/core";
 import { getMimeType, uploadFile, getDynamicGasSettings, looseEqual } from "./uploadFile";
 import { fetchResource } from "./fetchResource";
+import { createWTTPIgnore, WTTPIgnoreOptions } from "./wttpIgnore";
 
 const MAX_CHUNK_SIZE = 32 * 1024;
 
@@ -18,14 +19,21 @@ function isDirectory(sourcePath: string): boolean {
   return fs.statSync(sourcePath).isDirectory();
 }
 
-// Helper function to get all files in a directory recursively
-function getAllFiles(dirPath: string, arrayOfFiles: string[] = []): string[] {
+// Helper function to get all files in a directory recursively with ignore filtering
+function getAllFiles(dirPath: string, wttpIgnore: any, arrayOfFiles: string[] = []): string[] {
   const files = fs.readdirSync(dirPath);
 
   files.forEach((file) => {
     const fullPath = path.join(dirPath, file);
+    
+    // Check if this file/directory should be ignored
+    if (wttpIgnore && wttpIgnore.shouldIgnore(fullPath)) {
+      console.log(`🚫 Ignoring: ${path.relative(wttpIgnore.baseDir, fullPath)}`);
+      return;
+    }
+    
     if (isDirectory(fullPath)) {
-      arrayOfFiles = getAllFiles(fullPath, arrayOfFiles);
+      arrayOfFiles = getAllFiles(fullPath, wttpIgnore, arrayOfFiles);
     } else {
       arrayOfFiles.push(fullPath);
     }
@@ -34,8 +42,8 @@ function getAllFiles(dirPath: string, arrayOfFiles: string[] = []): string[] {
   return arrayOfFiles;
 }
 
-// Helper function to get all directories in a directory recursively
-function getAllDirectories(dirPath: string, basePath: string, arrayOfDirs: string[] = []): string[] {
+// Helper function to get all directories in a directory recursively with ignore filtering
+function getAllDirectories(dirPath: string, basePath: string, wttpIgnore: any, arrayOfDirs: string[] = []): string[] {
   const files = fs.readdirSync(dirPath);
   const relativeDirPath = path.relative(basePath, dirPath);
   
@@ -45,8 +53,15 @@ function getAllDirectories(dirPath: string, basePath: string, arrayOfDirs: strin
 
   files.forEach((file) => {
     const fullPath = path.join(dirPath, file);
+    
+    // Check if this directory should be ignored
+    if (wttpIgnore && wttpIgnore.shouldIgnore(fullPath)) {
+      console.log(`🚫 Ignoring directory: ${path.relative(wttpIgnore.baseDir, fullPath)}`);
+      return;
+    }
+    
     if (isDirectory(fullPath)) {
-      arrayOfDirs = getAllDirectories(fullPath, basePath, arrayOfDirs);
+      arrayOfDirs = getAllDirectories(fullPath, basePath, wttpIgnore, arrayOfDirs);
     }
   });
 
@@ -82,13 +97,19 @@ function findIndexFiles(dirPath: string): string[] {
   return indexFiles;
 }
 
-// Helper function to create directory metadata
-function createDirectoryMetadata(dirPath: string, basePath: string): Record<string, any> {
+// Helper function to create directory metadata with ignore filtering
+function createDirectoryMetadata(dirPath: string, basePath: string, wttpIgnore: any): Record<string, any> {
   const files = fs.readdirSync(dirPath);
   const directoryMetadata: Record<string, any> = {};
   
   files.forEach((file) => {
     const fullPath = path.join(dirPath, file);
+    
+    // Check if this file/directory should be ignored
+    if (wttpIgnore && wttpIgnore.shouldIgnore(fullPath)) {
+      return; // Skip ignored files
+    }
+    
     if (isDirectory(fullPath)) {
       directoryMetadata[file] = { "directory": true };
     } else {
@@ -109,7 +130,8 @@ function createDirectoryMetadata(dirPath: string, basePath: string): Record<stri
 export async function uploadDirectory(
   wttpSite: IBaseWTTPSite,
   sourcePath: string,
-  destinationPath: string
+  destinationPath: string,
+  ignoreOptions?: WTTPIgnoreOptions
 ) {
   console.log(`🚀 Starting directory upload: ${sourcePath} → ${destinationPath}`);
   
@@ -122,6 +144,10 @@ export async function uploadDirectory(
   }
   
   destinationPath = normalizePath(destinationPath, true);
+  
+  // Initialize WTTP ignore system
+  const wttpIgnore = createWTTPIgnore(sourcePath, ignoreOptions);
+  console.log(`📋 Using ${wttpIgnore.getPatterns().length} ignore patterns`);
   
   // Find the index files for the directory
   const indexFiles = findIndexFiles(sourcePath);
@@ -136,7 +162,7 @@ export async function uploadDirectory(
     redirectCode = 300;
 
     // First, we need to create a json object with the directory metadata
-    const directoryMetadata = createDirectoryMetadata(sourcePath, sourcePath);
+    const directoryMetadata = createDirectoryMetadata(sourcePath, sourcePath, wttpIgnore);
     const directoryMetadataJson = JSON.stringify(directoryMetadata, null, 2);
 
     if (directoryMetadataJson.length < MAX_CHUNK_SIZE) {
@@ -256,10 +282,16 @@ export async function uploadDirectory(
     const fullSourcePath = path.join(sourcePath, item);
     const fullDestPath = path.join(destinationPath, item).replace(/\\/g, '/');
     
+    // Check if this item should be ignored
+    if (wttpIgnore.shouldIgnore(fullSourcePath)) {
+      console.log(`🚫 Skipping ignored item: ${item}`);
+      continue;
+    }
+    
     try {
       if (isDirectory(fullSourcePath)) {
         // Recursively handle subdirectories
-        await uploadDirectory(wttpSite, fullSourcePath, fullDestPath);
+        await uploadDirectory(wttpSite, fullSourcePath, fullDestPath, ignoreOptions);
       } else {
         // Upload files
         console.log(`📤 Uploading file: ${item}`);
@@ -289,7 +321,7 @@ async function main() {
   // Connect to the WTTP site
   const wttpSite = await ethers.getContractAt("Web3Site", siteAddress);
   
-  // Upload the directory
+  // Upload the directory with default ignore options
   await uploadDirectory(wttpSite, sourcePath, destinationPath);
 }
 

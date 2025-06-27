@@ -1,0 +1,72 @@
+# WTTP Ignore File
+# This file works like .gitignore - patterns listed here will be excluded from WTTP uploads
+# Lines starting with # are comments and will be ignored
+# Empty lines are also ignored
+
+# Negation example: include specific files even if they match above patterns
+# !important.md
+# !dist/production.js
+
+# Directory-specific ignores
+# docs/drafts/
+# src/experimental/
+
+# Wildcard examples
+*.tmp
+temp_*
+**/debug.log 
+
+# Development and build artifacts
+dist/
+build/
+*.log
+.cache/
+.temp/
+.tmp/
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Package manager directories
+node_modules/
+.npm/
+.yarn/
+
+# Environment and secret files
+.env
+!.env.template
+
+# Version control
+
+# Operating system files
+desktop.ini
+
+# Documentation that shouldn't be deployed
+README.md
+CHANGELOG.md
+!LICENSE*
+*.md
+
+# Test files
+test/
+tests/
+*.test.js
+*.spec.js
+
+# Debugging files
+*.debug
+
+# Large media files (examples - adjust based on your needs)
+# *.mkv
+# *.avi
+# *.mp4
+# *.mov
+
+# Backup files
+*.bak
+*.backup
+*.old

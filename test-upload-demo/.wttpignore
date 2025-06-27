@@ -1,0 +1,9 @@
+# Custom .wttpignore for this test
+# This will be combined with the default ignore patterns
+
+# Test-specific ignores
+test-secret.txt
+draft-*
+
+# Allow some files that might normally be ignored
+!important.md 
