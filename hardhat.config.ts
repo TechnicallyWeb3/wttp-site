@@ -27,11 +27,19 @@ const config: HardhatUserConfig = {
     hardhat: {
       chainId: 31337,
       // Default hardhat network configuration
+      accounts: {
+        mnemonic: mnemonic,
+        count: 20
+      },
     },
     localhost: {
       url: "http://127.0.0.1:8545",
       chainId: 31337,
       // Connect to local hardhat node
+      accounts: {
+        mnemonic: mnemonic,
+        count: 20
+      },
     },
     sepolia: {
       chainId: 11155111,

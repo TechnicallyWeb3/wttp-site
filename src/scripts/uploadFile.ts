@@ -59,7 +59,38 @@ export function getMimeType(filePath: string): string {
   
   // Use mime-types package for lookup
   const mimeType = mime.lookup(filePath);
+  console.log(`Mime type string: ${mimeType}`);
   return mimeType ? mimeType.toString() : "application/octet-stream";
+}
+
+// Helper function to determine if a MIME type is text-based and should include charset
+function isTextMimeType(mimeType: string): boolean {
+  return mimeType.startsWith('text/') || 
+         mimeType.includes('javascript') || 
+         mimeType.includes('json') || 
+         mimeType.includes('xml') || 
+         mimeType.includes('html') || 
+         mimeType.includes('css') || 
+         mimeType.includes('svg');
+}
+
+// Helper function to get MIME type with charset for text files
+export function getMimeTypeWithCharset(filePath: string): { mimeType: string; charset: string | undefined } {
+  const baseMimeType = getMimeType(filePath);
+  
+  // For text-based files, add charset
+  if (isTextMimeType(baseMimeType)) {
+    return {
+      mimeType: baseMimeType,
+      charset: "utf-8"
+    };
+  }
+  
+  // For non-text files, no charset needed
+  return {
+    mimeType: baseMimeType,
+    charset: undefined
+  };
 }
 
 // Helper function to get dynamic gas settings based on current network conditions
@@ -223,11 +254,11 @@ export async function uploadFile(
   }
 
     
-  // Get MIME type
-  const mimeType = getMimeType(sourcePath).split("; charset=");
-  // const charset = mimeType.split("; charset=")[1] || "utf-8";
-  const mimeTypeBytes2 = encodeMimeType(mimeType[0]);
-  const charsetBytes2 = encodeCharset(mimeType[1]);
+  // Get MIME type and charset
+  const { mimeType, charset } = getMimeTypeWithCharset(sourcePath);
+  console.log(`Mime type: ${mimeType}, charset: ${charset || 'none'}`);
+  const mimeTypeBytes2 = encodeMimeType(mimeType);
+  const charsetBytes2 = charset ? encodeCharset(charset) : encodeCharset("");
 
   // Gas optimization settings for faster transactions
   const gasSettings = await getDynamicGasSettings();
