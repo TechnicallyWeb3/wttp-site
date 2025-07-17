@@ -70,3 +70,6 @@ tests/
 *.bak
 *.backup
 *.old
+
+.gitignore
+.htaccess

@@ -192,17 +192,18 @@ export async function uploadFile(
     console.warn("⚠️  Large file detected (>100MB). Upload may take significant time and gas.");
   }
 
-  let resourceExists = false;
-  try{
-    let existingResource = await fetchResource(await wttpSite.getAddress(), destinationPath);
-    let existingData = existingResource.content;
-    if (existingData && Buffer.from(existingData).equals(fileData)) {
-      return existingResource;
-    }
-    resourceExists = true;
-  } catch (error) {
-    console.log(`No resource found at ${destinationPath}, uploading...`);
-  }
+  // let resourceExists = false;
+  // try{
+  //   let existingResource = await fetchResource(await wttpSite.getAddress(), destinationPath, { datapoints: false });
+  //   let existingData = existingResource.content;
+  //   if (existingData && Buffer.from(existingData).equals(fileData)) {
+  //     console.log("✅ File already exists with identical content");
+  //     resourceExists = true;
+  //     // return existingResource; // We need to either check properties also or remove this return since properties may need to be updated. 
+  //   }
+  // } catch (error) {
+  //   console.log(`No resource found at ${destinationPath}, uploading...`);
+  // }
   
   // Chunk the data
   const chunks = chunkData(fileData, CHUNK_SIZE);
@@ -229,6 +230,12 @@ export async function uploadFile(
   const dpr = await ethers.getContractAt("@tw3/esp/contracts/interfaces/IDataPointRegistry.sol:IDataPointRegistry", dprAddress);
   
   let totalRoyalty = 0n;
+  let dataPointAddresses = new Array(dataRegistrations.length).fill("");
+  const resourceResponse = await fetchResource(await wttpSite.getAddress(), destinationPath);
+  const resourceDataPointAddresses = resourceResponse.response.resource.dataPoints;
+  const resourceExists = resourceDataPointAddresses.length > 0;
+  
+  let chunksToUpload: number[] = []; // Array of chunk indices that need uploading
   
   // Check royalties for each chunk before uploading
   console.log(`📊 Calculating royalties for ${dataRegistrations.length} chunks...`);
@@ -237,15 +244,27 @@ export async function uploadFile(
     
     // Calculate the data point address
     const dataPointAddress = await dps.calculateAddress(chunk.data);
+    dataPointAddresses[i] = dataPointAddress;
     
-    // Get the royalty
-    royalty[i] = await dpr.getDataPointRoyalty(dataPointAddress);
-    totalRoyalty += royalty[i];
-    
-    console.log(`Chunk ${i + 1}/${dataRegistrations.length}: ${ethers.formatEther(royalty[i])} ETH`);
+    // Check if this chunk already exists in the resource
+    const existingAddress = resourceDataPointAddresses[i]?.toString();
+    if (existingAddress === dataPointAddress) {
+      console.log(`✅ Chunk ${i + 1}/${dataRegistrations.length} already exists, skipping`);
+      royalty[i] = 0n; // No cost for existing chunks
+    } else {
+      // Chunk needs to be uploaded
+      chunksToUpload.push(i);
+      
+      // Get the royalty for this chunk
+      royalty[i] = await dpr.getDataPointRoyalty(dataPointAddress);
+      totalRoyalty += royalty[i];
+      
+      console.log(`📤 Chunk ${i + 1}/${dataRegistrations.length}: ${ethers.formatEther(royalty[i])} ETH`);
+    }
   }
   
   console.log(`💰 Total royalty required: ${ethers.formatEther(totalRoyalty)} ETH`);
+  console.log(`📋 Chunks to upload: ${chunksToUpload.length}/${dataRegistrations.length}`);
   
   // Check if user has sufficient balance
   const balance = await ethers.provider.getBalance(signerAddress);
@@ -282,31 +301,58 @@ export async function uploadFile(
     data: [dataRegistrations[0]]
   };
 
-  // compare properties against head.metadata.properties
-  const response = await fetchResource(await wttpSite.getAddress(), destinationPath);
-  if (looseEqual(response.response.head.metadata.properties, putRequest.properties)) {
-    // check if data is the same
-    if (Buffer.compare(ethers.getBytes(response.content || "0x"), fileData) === 0) {
-      console.log("File data is the same, skipping upload");
-      return response;
-    }
+  // Early exit if no chunks need uploading and properties match
+  if (chunksToUpload.length === 0 && looseEqual(resourceResponse.response.head.metadata.properties, putRequest.properties)) {
+    console.log("✅ File is identical (properties and data), skipping upload");
+    return resourceResponse;
   }
-  // if (head.response.head.metadata.properties.mimeType !== mimeTypeBytes2) {
-  //   throw new Error(`Mime type mismatch: ${head.response.head.metadata.properties.mimeType} !== ${mimeTypeBytes2}`);
-  // }
-  // if (head.response.head.metadata.properties.charset !== "0x7508") {
+
+  let needsPUT = false;
+  let patchChunks = [...chunksToUpload]; // Copy of chunks to upload
+
+  // Check if properties are different (requires PUT)
+  if (!looseEqual(resourceResponse.response.head.metadata.properties, putRequest.properties)) {
+    console.log("❌ File properties are different, requires PUT");
+    // console.log("Response properties:", resourceResponse.response.head.metadata.properties);
+    // console.log("Put request properties:", putRequest.properties);
+    needsPUT = true;
+  } else {
+    console.log("✅ File properties are identical, using PATCH only");
+  }
+
+  // If we need PUT and chunk 0 is in the upload list, PUT handles chunk 0
+  if (needsPUT) {
+    // If chunk 0 data is unchanged but we need PUT, we still need to pay royalty for chunk 0
+    if (!chunksToUpload.includes(0)) {
+      console.log("📊 Calculating royalty for chunk 0 (needed for PUT with unchanged data)...");
+      royalty[0] = await dpr.getDataPointRoyalty(dataPointAddresses[0]);
+      totalRoyalty += royalty[0];
+      console.log(`💰 Additional royalty for PUT: ${ethers.formatEther(royalty[0])} ETH`);
+      
+      // Re-check balance with updated royalty
+      const balance = await ethers.provider.getBalance(signerAddress);
+      if (balance < totalRoyalty) {
+        throw new Error(`Insufficient balance after adding PUT royalty. Required: ${ethers.formatEther(totalRoyalty)} ETH, Available: ${ethers.formatEther(balance)} ETH`);
+      }
+    }
     
-  console.log(`🚀 Sending PUT transaction with optimized gas settings...`);
-  const tx = await wttpSite.PUT(putRequest, { 
-    value: royalty[0],
-    ...gasSettings // TODO: Uncomment this when gas settings are working
-  });
-  await tx.wait();
-  console.log("File created successfully!");
+    console.log(`🚀 Sending PUT transaction with optimized gas settings...`);
+    const tx = await wttpSite.PUT(putRequest, { 
+      value: royalty[0],
+      ...gasSettings // TODO: Uncomment this when gas settings are working
+    });
+    await tx.wait();
+    console.log("✅ PUT transaction completed - file properties and first chunk updated");
+    
+    // Remove chunk 0 from PATCH list if it was there
+    patchChunks = patchChunks.filter(i => i !== 0);
+  }
 
   // Upload remaining chunks with progress reporting
-  for (let i = 1; i < dataRegistrations.length; i++) {
-    console.log(`📤 Uploading chunk ${i + 1}/${dataRegistrations.length} (${Math.round((i + 1) / dataRegistrations.length * 100)}%)`);
+  for (let i = 0; i < patchChunks.length; i++) {
+    const chunkIndex = patchChunks[i];
+    const progress = Math.round(((i + 1) / patchChunks.length) * 100);
+    console.log(`📤 Uploading chunk ${chunkIndex + 1}/${dataRegistrations.length} (${i + 1}/${patchChunks.length}, ${progress}%)`);
     
     try {
       // Get fresh gas settings for each chunk to adapt to network conditions
@@ -314,21 +360,23 @@ export async function uploadFile(
       
       const patchRequest = {
         head: headRequest,
-        data: [dataRegistrations[i]]
+        data: [dataRegistrations[chunkIndex]]
       };
     
       console.log(`🚀 Sending PATCH transaction ${i + 1} with updated gas settings...`);
       const tx = await wttpSite.PATCH(patchRequest, { 
-        value: royalty[i],
-        ...currentGasSettings // TODO: Uncomment this when gas settings are working
+        value: royalty[chunkIndex],
+        ...currentGasSettings
       });
       await tx.wait();
-      console.log(`✅ Chunk ${i + 1} uploaded successfully (${ethers.formatEther(royalty[i])} ETH)`);
+      console.log(`✅ Chunk ${chunkIndex + 1} uploaded successfully (${ethers.formatEther(royalty[chunkIndex])} ETH)`);
     } catch (error) {
-      console.error(`❌ Failed to upload chunk ${i + 1}:`, error);
-      throw new Error(`Upload failed at chunk ${i + 1}: ${error}`);
+      console.error(`❌ Failed to upload chunk ${chunkIndex + 1}:`, error);
+      throw new Error(`Upload failed at chunk ${chunkIndex + 1}: ${error}`);
     }
   }
+
+  console.log(`🎉 Upload completed! ${chunksToUpload.length} chunks uploaded successfully.`);
 
   let fetchResult;
   try{
