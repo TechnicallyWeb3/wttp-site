@@ -107,7 +107,7 @@ export async function fetchResource(
     try {
       head = await siteContract.HEAD(headRequest_obj) as HEADResponseStruct;
     } catch (error: any) {
-      console.log(error.message);
+      console.log("HEAD request failed, assuming file doesn't exist");
     }
 
     return { response: { head, resource: { dataPoints: [], totalChunks: 0 } }, content: undefined };

@@ -27,11 +27,25 @@ const config: HardhatUserConfig = {
     hardhat: {
       chainId: 31337,
       // Default hardhat network configuration
+      accounts: {
+        mnemonic: mnemonic,
+        count: 20
+      },
+      // // Set reasonable gas prices for local development
+      // gasPrice: 1000000000, // 1 gwei
+      // gas: 12000000, // 12M gas limit
     },
     localhost: {
       url: "http://127.0.0.1:8545",
       chainId: 31337,
       // Connect to local hardhat node
+      accounts: {
+        mnemonic: mnemonic,
+        count: 20
+      },
+      // // Set reasonable gas prices for local development
+      // gasPrice: 1000000000, // 1 gwei
+      // gas: 12000000, // 12M gas limit
     },
     sepolia: {
       chainId: 11155111,
