@@ -14,6 +14,8 @@ Our tools solve these problems by analyzing actual usage and creating optimized,
 
 ## Tools Available
 
+The WTTP project includes three specialized tools for WordPress site optimization:
+
 ### 1. `wp-minimize` - Site Minification Tool
 
 Analyzes WordPress exports to identify and remove unused files.
@@ -78,10 +80,148 @@ npx hardhat wp-minimize --path ./exported-site --debug
 
 Converts broken WordPress forms (Ninja Forms, etc.) into functional HTML forms with API integration.
 
+### 3. `wp-routes` - Route Management Tool
+
+Handles custom route redirects and link replacements in WordPress sites using a configuration-driven approach.
+
 #### Usage
 ```bash
-# Convert forms in WordPress export
-npx hardhat wp-ninja-fix --path ./exported-site
+# First, create routes.json configuration in your site directory
+# Example: {"routes": {"/home/": {"redirect": "/", "method": "both"}}}
+
+# Preview what would be changed (safe)
+npx hardhat wp-routes --path ./exported-site --dry-run
+
+# Apply route changes
+npx hardhat wp-routes --path ./exported-site
+
+# Use custom config file location
+npx hardhat wp-routes --path ./exported-site --config-file ./custom-routes.json
+
+# Skip creating backup files
+npx hardhat wp-routes --path ./exported-site --no-backup
+
+# Skip creating client-side redirect script
+npx hardhat wp-routes --path ./exported-site --no-redirect
+```
+
+#### How It Works
+
+1. **Configuration Loading**
+   - Reads `routes.json` from site directory (or custom location)
+   - Defines source routes, target routes, and processing methods
+   - Configures backup and redirect settings
+
+2. **Link Replacement**
+   - Scans all HTML files for matching route patterns
+   - Updates `href` attributes, canonical URLs, and oEmbed references
+   - Creates backup files with `.backup.html` extension
+   - Avoids WordPress core files and assets
+
+3. **Client-Side Redirects**
+   - Generates JavaScript file for browser-level redirects
+   - Handles cases where users directly visit old URLs
+   - Preserves query parameters and hash fragments
+   - Acts as safety net for any missed links
+
+#### Configuration Format (`routes.json`)
+
+```json
+{
+  "routes": {
+    "/home/": {
+      "redirect": "/",
+      "description": "Home page redirects to root",
+      "method": "both"
+    },
+    "/old-services/": {
+      "redirect": "/services/",
+      "description": "Legacy services page",
+      "method": "replace"
+    }
+  },
+  "settings": {
+    "backupOriginals": true,
+    "updateCanonicalUrls": true,
+    "updateOembedUrls": true,
+    "clientSideRedirects": true,
+    "preserveQueryParams": true,
+    "preserveHashFragments": true
+  },
+  "patterns": {
+    "linkAttributes": ["href"],
+    "urlPatterns": [
+      "href=\"{from}\"",
+      "href='{from}'",
+      "canonical.*{from}",
+      "oembed.*{from}"
+    ],
+    "excludePatterns": [
+      "wp-admin", "wp-content", "wp-includes",
+      ".js", ".css", ".png", ".jpg", ".gif", ".svg"
+    ]
+  }
+}
+```
+
+#### Route Methods
+
+- **`replace`**: Only update links in HTML files
+- **`redirect`**: Only create client-side redirects  
+- **`both`**: Update links AND create redirects (recommended)
+
+#### Generated Files
+
+- **Backup Files**: `*.backup.html` (automatically added to `.wttpignore`)
+- **Redirect Script**: `wp-content/themes/route-redirects.js`
+
+#### Example Results
+```
+🔄 Processing routes for ./mancino
+📋 Found 1 route(s) to process
+📄 Found 7 HTML files to process
+  ✨ contact-us\index.html: 2 link(s) updated
+  ✨ services\index.html: 2 link(s) updated
+  ✨ index.html: 2 link(s) updated
+📜 Created client-side redirect script
+
+📊 Processing Statistics:
+   📄 Files processed: 7
+   🔗 Links replaced: 14
+   📜 Redirects created: 1
+   💾 Backups created: 7
+```
+
+#### Usage Examples
+
+**Basic Home Page Redirect**
+```json
+{
+  "routes": {
+    "/home/": {"redirect": "/", "method": "both"}
+  }
+}
+```
+
+**Multiple Route Management**
+```json
+{
+  "routes": {
+    "/home/": {"redirect": "/"},
+    "/blog/": {"redirect": "/news/"},
+    "/old-contact/": {"redirect": "/contact-us/"}
+  }
+}
+```
+
+**Link-Only Updates (No Redirects)**
+```json
+{
+  "routes": {
+    "/temp-page/": {"redirect": "/permanent/", "method": "replace"}
+  },
+  "settings": {"clientSideRedirects": false}
+}
 ```
 
 #### How It Works
@@ -163,11 +303,16 @@ npx hardhat wp-minimize --path ./wordpress-export --dry-run
 # 2. Fix forms first (creates backups)
 npx hardhat wp-ninja-fix --path ./wordpress-export
 
-# 3. Then minimize (creates .wttpignore)
+# 3. Handle route redirects (if needed)
+# Create routes.json configuration first, then:
+npx hardhat wp-routes --path ./wordpress-export --dry-run
+npx hardhat wp-routes --path ./wordpress-export
+
+# 4. Then minimize (creates .wttpignore)
 npx hardhat wp-minimize --path ./wordpress-export
 
-# 4. Test the site works properly
-# 5. If satisfied, actually delete files
+# 5. Test the site works properly
+# 6. If satisfied, actually delete files
 npx hardhat wp-minimize --path ./wordpress-export --delete-files
 ```
 
@@ -199,6 +344,12 @@ npx hardhat wp-minimize --path ./wordpress-export --delete-files
 - Restore from backup: `cp -r wordpress-export-backup/* wordpress-export/`
 - Re-run with `--dry-run` to understand what's being changed
 - Exclude specific directories if needed
+
+### Route Redirects Not Working
+- Check that `routes.json` syntax is valid JSON
+- Verify the redirect script was created in `wp-content/themes/`
+- Ensure client-side redirects are enabled in settings
+- Test with browser network tools to see redirect behavior
 
 ## Integration with WTTP
 
