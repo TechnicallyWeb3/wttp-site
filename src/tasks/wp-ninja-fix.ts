@@ -146,7 +146,11 @@ class NinjaFormsFixer {
         }
         
         if (this.createBackups) {
-          const backupPath = htmlFile.replace('.html', '.backup.html');
+          // Generate proper backup filename: index.html -> index.ninja.html
+          const dir = path.dirname(htmlFile);
+          const filename = path.basename(htmlFile, '.html');
+          const backupPath = path.join(dir, `${filename}.ninja.html`);
+          
           console.log(`   💾 Would create backup: ${path.relative(this.sitePath, backupPath)}`);
           
           const wttpIgnorePath = path.join(this.sitePath, '.wttpignore');
@@ -181,8 +185,8 @@ class NinjaFormsFixer {
         
         if (file.isDirectory()) {
           walkDir(fullPath);
-        } else if (file.name.endsWith('.html') && !file.name.includes('backup')) {
-          // Exclude backup files from processing (backup.html, *.backup.html)
+        } else if (file.name.endsWith('.html') && !file.name.includes('backup') && !file.name.includes('ninja') && !file.name.includes('routes')) {
+          // Exclude backup files from processing (backup.html, *.backup.html, *.ninja.html, *.routes.html)
           this.htmlFiles.push(fullPath);
         }
       }
@@ -361,9 +365,13 @@ class NinjaFormsFixer {
       if (modified) {
         let backupPath: string | null = null;
         
-        // Create backup only if flag is set
-        if (this.createBackups) {
-          backupPath = htmlFile.replace('.html', '.backup.html');
+        // Create backup only if flag is set AND file contains Ninja Forms
+        if (this.createBackups && matches && matches.length > 0) {
+          // Generate proper backup filename: index.html -> index.ninja.html
+          const dir = path.dirname(htmlFile);
+          const filename = path.basename(htmlFile, '.html');
+          backupPath = path.join(dir, `${filename}.ninja.html`);
+          
           const originalContent = fs.readFileSync(htmlFile, 'utf-8');
           fs.writeFileSync(backupPath, originalContent);
           console.log(`💾 Created backup: ${path.relative(this.sitePath, backupPath)}`);
@@ -598,15 +606,15 @@ async function submitContactForm(event, formId) {
     
     console.log(`   🎯 Using SELECTIVE JavaScript removal (targeting Ninja Forms only)`);
     
-    // 1. Remove complete Ninja Forms script blocks by ID
-    const nfScriptMatches = modifiedContent.match(/<script[^>]*id="[^"]*nf-[^"]*"[^>]*>[\s\S]*?<\/script>/g);
+    // 1. Remove complete Ninja Forms script blocks by ID (handle both single and double quotes)
+    const nfScriptMatches = modifiedContent.match(/<script[^>]*id=['"][^'"]*nf-[^'"]*['"][^>]*>[\s\S]*?<\/script>/g);
     if (nfScriptMatches) {
       console.log(`   🗑️  Removing ${nfScriptMatches.length} Ninja Forms script block(s) by ID`);
       nfScriptMatches.forEach((match, index) => {
         console.log(`     ${index + 1}: ${match.length} characters (ID-based removal)`);
         totalRemoved += match.length;
       });
-      modifiedContent = modifiedContent.replace(/<script[^>]*id="[^"]*nf-[^"]*"[^>]*>[\s\S]*?<\/script>/g, '');
+      modifiedContent = modifiedContent.replace(/<script[^>]*id=['"][^'"]*nf-[^'"]*['"][^>]*>[\s\S]*?<\/script>/g, '');
     }
 
     // 2. Selectively clean inline scripts that contain Ninja Forms content
@@ -664,15 +672,15 @@ async function submitContactForm(event, formId) {
       return scriptMatch;
     });
 
-    // 3. Remove Ninja Forms template scripts
-    const tmplMatches = modifiedContent.match(/<script[^>]*id="tmpl-nf-[^"]*"[\s\S]*?<\/script>/g);
+    // 3. Remove Ninja Forms template scripts (handle both single and double quotes)
+    const tmplMatches = modifiedContent.match(/<script[^>]*id=['"]tmpl-nf-[^'"]*['"][\s\S]*?<\/script>/g);
     if (tmplMatches) {
       console.log(`   🗑️  Removing ${tmplMatches.length} Ninja Forms template script(s)`);
       tmplMatches.forEach((match, index) => {
         console.log(`     ${index + 1}: ${match.length} characters`);
         totalRemoved += match.length;
       });
-      modifiedContent = modifiedContent.replace(/<script[^>]*id="tmpl-nf-[^"]*"[\s\S]*?<\/script>/g, '');
+      modifiedContent = modifiedContent.replace(/<script[^>]*id=['"]tmpl-nf-[^'"]*['"][\s\S]*?<\/script>/g, '');
     }
     
     // 4. Remove Ninja Forms CSS/JS file references

@@ -41,7 +41,7 @@ class WordPressRouteProcessor {
   private backup: boolean;
   private stats: ProcessingStats;
 
-  constructor(sitePath: string, configPath?: string, dryRun = false, backup = true) {
+  constructor(sitePath: string, configPath?: string, dryRun = false, backup = false) {
     this.sitePath = sitePath;
     this.dryRun = dryRun;
     this.backup = backup;
@@ -61,7 +61,31 @@ class WordPressRouteProcessor {
 
     try {
       const configContent = fs.readFileSync(routesConfigPath, 'utf-8');
-      this.config = JSON.parse(configContent);
+      const loadedConfig = JSON.parse(configContent);
+      
+      // Ensure all required properties exist with defaults
+      this.config = {
+        routes: loadedConfig.routes || {},
+        settings: {
+          backupOriginals: false,
+          updateCanonicalUrls: true,
+          updateOembedUrls: true,
+          clientSideRedirects: true,
+          preserveQueryParams: true,
+          preserveHashFragments: true,
+          ...loadedConfig.settings
+        },
+        patterns: {
+          linkAttributes: ['href', 'src', 'action'],
+          urlPatterns: [
+            'href=["\']([^"\']*{from}[^"\']*)["\']',
+            'src=["\']([^"\']*{from}[^"\']*)["\']',
+            'action=["\']([^"\']*{from}[^"\']*)["\']'
+          ],
+          excludePatterns: ['mailto:', 'tel:', 'javascript:', '#'],
+          ...loadedConfig.patterns
+        }
+      };
     } catch (error) {
       throw new Error(`Failed to parse routes configuration: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -110,7 +134,9 @@ class WordPressRouteProcessor {
           if (!this.shouldSkipDirectory(entry.name)) {
             scanDirectory(fullPath);
           }
-        } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.html')) {
+        } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.html') && 
+                   !entry.name.includes('backup') && !entry.name.includes('ninja') && !entry.name.includes('routes')) {
+          // Exclude backup files from processing (*.backup.html, *.ninja.html, *.routes.html)
           htmlFiles.push(fullPath);
         }
       }
@@ -211,7 +237,11 @@ class WordPressRouteProcessor {
 
   private async createBackup(filePath: string, content: string): Promise<void> {
     try {
-      const backupPath = `${filePath}.backup.html`;
+      // Generate proper backup filename: index.html -> index.routes.html
+      const dir = path.dirname(filePath);
+      const filename = path.basename(filePath, '.html');
+      const backupPath = path.join(dir, `${filename}.routes.html`);
+      
       fs.writeFileSync(backupPath, content, 'utf-8');
       this.stats.backupsCreated++;
       
@@ -359,7 +389,7 @@ ${routes.join(',\n')}
     console.log(`   📜 Client-side redirects that would be created: ${Object.keys(this.config.routes).length}`);
     
     if (this.config.settings.backupOriginals) {
-      console.log(`   💾 Backup files that would be created: ${totalLinks > 0 ? htmlFiles.filter(f => {
+      console.log(`   💾 Backup files that would be created (.routes.html): ${totalLinks > 0 ? htmlFiles.filter(f => {
         const content = fs.readFileSync(f, 'utf-8');
         return Object.entries(this.config.routes).some(([from, config]) => {
           if (config.method === "redirect") return false;
@@ -374,10 +404,10 @@ task("wp-routes", "Process WordPress site routes using routes.json configuration
   .addParam("path", "Path to WordPress site directory")
   .addOptionalParam("configFile", "Path to routes.json configuration file (defaults to {path}/routes.json)")
   .addFlag("dryRun", "Show what would be done without making changes")
-  .addFlag("noBackup", "Skip creating backup files")
+  .addFlag("backup", "Create backup files")
   .addFlag("noRedirect", "Skip creating client-side redirect script")
   .setAction(async (taskArgs, hre: HardhatRuntimeEnvironment) => {
-    const { path: sitePath, configFile, dryRun, noBackup, noRedirect } = taskArgs;
+    const { path: sitePath, configFile, dryRun, backup, noRedirect } = taskArgs;
 
     if (!fs.existsSync(sitePath)) {
       throw new Error(`Site path does not exist: ${sitePath}`);
@@ -388,7 +418,7 @@ task("wp-routes", "Process WordPress site routes using routes.json configuration
         sitePath, 
         configFile, 
         dryRun, 
-        !noBackup
+        backup
       );
 
       // Temporarily disable client redirects if requested

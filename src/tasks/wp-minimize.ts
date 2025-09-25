@@ -57,6 +57,10 @@ class WordPressMinimizer {
         if (file.isDirectory()) {
           walkDir(fullPath);
         } else {
+          // Skip special files that should never be considered unused
+          if (file.name === '.wttpignore' || file.name === 'routes.json') {
+            continue;
+          }
           const stats = fs.statSync(fullPath);
           this.fileUsage.set(relativePath, {
             path: relativePath,
@@ -255,6 +259,9 @@ class WordPressMinimizer {
       `# Generated on: ${new Date().toISOString()}`,
       `# Unused files: ${unusedFiles.length}`,
       `# Space savings: ${this.formatBytes(unusedFiles.reduce((sum, f) => sum + f.size, 0))}`,
+      "",
+      "# Special files (always ignored):",
+      "routes.json",
       "",
       "# Unused files (safe to ignore):"
     ];
