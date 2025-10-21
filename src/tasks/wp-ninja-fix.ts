@@ -93,7 +93,12 @@ class NinjaFormsFixer {
         // Simulate form replacement
         let simulatedContent = content;
         formMatches.forEach((match, index) => {
-          const form = this.formsFound[0]; // Use first form for simulation
+          // Extract form ID from the match for proper form matching
+          const formIdMatch = match.match(/nf-form-(\d+)-cont/);
+          const formIdFromHtml = formIdMatch ? formIdMatch[1] : null;
+          
+          // Find the corresponding form data
+          const form = this.formsFound.find(f => f.id.toString() === formIdFromHtml) || this.formsFound[0];
           const replacement = this.generateReplacementForm(form);
           const position = simulatedContent.indexOf(match);
           
@@ -225,9 +230,6 @@ class NinjaFormsFixer {
             if (settings.formContentData && Array.isArray(settings.formContentData)) {
               // Convert formContentData array to field objects  
               parsedFields = this.parseFormContentData(settings.formContentData);
-              console.log(`🔍 DEBUG: Using formContentData approach - found ${parsedFields.length} fields`);
-              console.log(`🔍 DEBUG: formContentData keys:`, settings.formContentData);
-              console.log(`🔍 DEBUG: Parsed field types:`, parsedFields.map(f => `${f.key}:${f.type}`));
             }
             
             if (parsedFields.length > 0) {
@@ -246,7 +248,6 @@ class NinjaFormsFixer {
       }
       
       // Also look for form.fields array specifically (this contains full field definitions)
-      console.log(`🔍 DEBUG: Looking for form.fields array in ${path.relative(this.sitePath, htmlFile)}`);
       const fieldsStartRegex = /form\.fields\s*=\s*\[/g;
       let fieldsMatch;
       fieldsStartRegex.lastIndex = 0;
@@ -422,7 +423,7 @@ class NinjaFormsFixer {
       let options: { label: string; value: string; selected?: boolean }[] | undefined;
       
       // Extract options for radio/select fields
-      if (field.type === 'listradio' || field.type === 'select') {
+      if (field.type === 'listradio' || field.type === 'select' || field.type === 'listselect') {
         if (field.options && Array.isArray(field.options)) {
           options = field.options.map((opt: any) => ({
             label: opt.label || opt.text || opt.value || 'Option',
@@ -518,7 +519,9 @@ class NinjaFormsFixer {
       'url': 'url',
       'date': 'date',
       'listradio': 'radio',
-      'select': 'select'
+      'listselect': 'select',
+      'select': 'select',
+      'checkbox': 'checkbox'
     };
     
     return typeMap[type] || 'text';
@@ -580,8 +583,21 @@ class NinjaFormsFixer {
           console.log(`   ${match}`);
         }
         
-        // Find which form this is
-        const form = this.formsFound[0]; // For now, use the first form found
+        // Extract form ID from the match (e.g., "nf-form-4-cont" -> "4")
+        const formIdMatch = match.match(/nf-form-(\d+)-cont/);
+        const formIdFromHtml = formIdMatch ? formIdMatch[1] : null;
+        
+        // Find the corresponding form data
+        let form = this.formsFound.find(f => f.id.toString() === formIdFromHtml);
+        
+        // Fallback to first form if no match found
+        if (!form) {
+          console.log(`⚠️  No form found for ID ${formIdFromHtml}, using first available form`);
+          form = this.formsFound[0];
+        } else {
+          console.log(`✅ Found matching form data for ID ${formIdFromHtml}: "${form.title}"`);
+        }
+        
         const replacement = this.generateReplacementForm(form);
         
         console.log(`📤 REPLACEMENT (${replacement.length} chars):`);
@@ -718,6 +734,24 @@ class NinjaFormsFixer {
   cursor: pointer;
 }
 
+.checkbox-field .checkbox-option {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.checkbox-field input[type="checkbox"] {
+  width: auto;
+  margin-right: 8px;
+  margin-bottom: 0;
+}
+
+.checkbox-field label {
+  margin: 0;
+  font-weight: normal;
+  cursor: pointer;
+}
+
 .form-field textarea {
   min-height: 120px;
   resize: vertical;
@@ -794,7 +828,7 @@ async function submitContactForm(event, formId) {
     const currentHost = window.location.hostname;
     
     // Prepare API URL
-    const apiUrl = \`https://notify.mancino.ca/api/form-response?url=\${encodeURIComponent(currentHost)}&response=\${encodeURIComponent(JSON.stringify(formObject))}\`;
+    const apiUrl = \`https://notify.mancino.ca/api/form-response?url=\${encodeURIComponent(currentHost)}\`;
     
     // Submit to your API
     const response = await fetch(apiUrl, {
@@ -840,8 +874,6 @@ async function submitContactForm(event, formId) {
   }
 
   private generateFieldHtml(field: FormField): string {
-    console.log(`🔍 DEBUG: Generating HTML for field "${field.key}" with type="${field.type}" and ${field.options?.length || 0} options`);
-    
     const requiredAttr = field.required ? 'required' : '';
     const requiredMark = field.required ? '<span class="required">*</span>' : '';
     const placeholder = field.placeholder ? `placeholder="${field.placeholder}"` : '';
@@ -897,9 +929,23 @@ async function submitContactForm(event, formId) {
         name="${field.key}" 
         ${requiredAttr}
       >
-        <option value="">Please select...</option>
         ${selectOptions}
       </select>
+    </div>`;
+    } else if (field.type === 'checkbox') {
+      // Generate checkbox input
+      return `
+    <div class="form-field checkbox-field">
+      <div class="checkbox-option">
+        <input 
+          type="checkbox" 
+          id="${field.key}" 
+          name="${field.key}" 
+          value="1"
+          ${requiredAttr}
+        />
+        <label for="${field.key}">${field.label}${requiredMark}</label>
+      </div>
     </div>`;
     } else {
       return `
