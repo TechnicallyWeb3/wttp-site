@@ -200,11 +200,50 @@ class NinjaFormsFixer {
     for (const htmlFile of this.htmlFiles) {
       const content = fs.readFileSync(htmlFile, 'utf-8');
       
-      // Look for Ninja Forms JavaScript data
-      const formDataRegex = /var\s+formDisplay\s*=\s*1;[\s\S]*?var\s+form\s*=\s*\[\];[\s\S]*?form\.id\s*=\s*['"](\d+)['"];[\s\S]*?form\.settings\s*=\s*(\{[\s\S]*?\});[\s\S]*?form\.fields\s*=\s*(\[[\s\S]*?\]);/g;
+      // Look for Ninja Forms JavaScript data - handle both old and new formats
+      // New format: formContentData in settings object (handles nfForms variable too)
+      const newFormatRegex = /var\s+formDisplay\s*=\s*1;[\s\S]*?var\s+form\s*=\s*\[\];[\s\S]*?form\.id\s*=\s*['"](\d+)['"];[\s\S]*?form\.settings\s*=\s*(\{[\s\S]*?\});/g;
+      // Old format: separate form.fields assignment
+      const oldFormatRegex = /var\s+formDisplay\s*=\s*1;[\s\S]*?var\s+form\s*=\s*\[\];[\s\S]*?form\.id\s*=\s*['"](\d+)['"];[\s\S]*?form\.settings\s*=\s*(\{[\s\S]*?\});[\s\S]*?form\.fields\s*=\s*(\[[\s\S]*?\]);/g;
       
+      // Try new format first
       let match;
-      while ((match = formDataRegex.exec(content)) !== null) {
+      newFormatRegex.lastIndex = 0;
+      while ((match = newFormatRegex.exec(content)) !== null) {
+        try {
+          const formId = match[1];
+          const settingsStr = match[2];
+          
+          // Parse settings to get form title and fields
+          const settings = this.safeJsonParse(settingsStr);
+          
+          if (settings) {
+            let parsedFields: FormField[] = [];
+            
+            // Check if formContentData exists in settings (new format)
+            if (settings.formContentData && Array.isArray(settings.formContentData)) {
+              // Convert formContentData array to field objects  
+              parsedFields = this.parseFormContentData(settings.formContentData);
+            }
+            
+            if (parsedFields.length > 0) {
+              this.formsFound.push({
+                id: formId,
+                title: settings.title || settings.form_title || 'Contact Form',
+                fields: parsedFields
+              });
+              
+              console.log(`📋 Found form: "${settings.title || settings.form_title}" with ${parsedFields.length} fields in ${path.relative(this.sitePath, htmlFile)}`);
+            }
+          }
+        } catch (error) {
+          console.warn(`⚠️  Error parsing form data in ${htmlFile}:`, error);
+        }
+      }
+      
+      // Try old format as fallback
+      oldFormatRegex.lastIndex = 0;
+      while ((match = oldFormatRegex.exec(content)) !== null) {
         try {
           const formId = match[1];
           const settingsStr = match[2];
@@ -242,7 +281,27 @@ class NinjaFormsFixer {
       
       return JSON.parse(cleaned);
     } catch (e) {
-      // If direct parsing fails, try to extract just the data we need
+      // If direct parsing fails, try to extract key data manually
+      if (jsonStr.includes('"formContentData"')) {
+        const formContentMatch = jsonStr.match(/"formContentData":\s*(\[.*?\])/);
+        const titleMatch = jsonStr.match(/"title":\s*"([^"]+)"/);
+        const formTitleMatch = jsonStr.match(/"form_title":\s*"([^"]+)"/);
+        
+        if (formContentMatch) {
+          try {
+            const formContentData = JSON.parse(formContentMatch[1]);
+            return {
+              title: titleMatch ? titleMatch[1] : (formTitleMatch ? formTitleMatch[1] : 'Contact Form'),
+              form_title: formTitleMatch ? formTitleMatch[1] : undefined,
+              formContentData: formContentData
+            };
+          } catch (parseError) {
+            // Continue to fallback
+          }
+        }
+      }
+      
+      // Fallback: extract just title
       if (jsonStr.includes('"title"')) {
         const titleMatch = jsonStr.match(/"title":\s*"([^"]+)"/);
         return { title: titleMatch ? titleMatch[1] : 'Contact Form' };
@@ -272,6 +331,58 @@ class NinjaFormsFixer {
     fields.sort((a, b) => a.order - b.order);
     
     return fields;
+  }
+
+  private parseFormContentData(formContentData: string[]): FormField[] {
+    const fields: FormField[] = [];
+    
+    for (let i = 0; i < formContentData.length; i++) {
+      const fieldKey = formContentData[i];
+      
+      if (fieldKey === 'submit') continue; // Skip submit buttons
+      
+      // Generate field info from the key
+      let fieldType = 'text';
+      let fieldLabel = this.generateLabelFromKey(fieldKey);
+      
+      // Detect field type from key patterns
+      if (fieldKey.includes('email')) {
+        fieldType = 'email';
+      } else if (fieldKey.includes('phone')) {
+        fieldType = 'tel';
+      } else if (fieldKey.includes('message')) {
+        fieldType = 'textarea';
+      } else if (fieldKey.includes('contact_method') || fieldKey.includes('preferred_contact')) {
+        fieldType = 'select';
+      }
+      
+      fields.push({
+        id: i + 1,
+        type: fieldType,
+        label: fieldLabel,
+        key: fieldKey,
+        required: ['name', 'email'].some(req => fieldKey.includes(req)), // Assume name and email are required
+        placeholder: '',
+        order: i + 1
+      });
+    }
+    
+    return fields;
+  }
+
+  private generateLabelFromKey(key: string): string {
+    // Convert field keys to readable labels
+    if (key === 'name') return 'Name';
+    if (key === 'email') return 'Email';
+    if (key.includes('phone')) return 'Phone';
+    if (key.includes('message')) return 'Message';
+    if (key.includes('contact_method') || key.includes('preferred_contact')) return 'Preferred Contact Method';
+    
+    // Generic conversion: remove numbers, replace underscores with spaces, capitalize
+    return key
+      .replace(/_\d+$/, '') // Remove trailing numbers like _1760598589490
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, l => l.toUpperCase());
   }
 
   private normalizeFieldType(type: string): string {

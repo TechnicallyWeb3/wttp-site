@@ -246,11 +246,23 @@ export async function uploadFile(
     const dataPointAddress = await dps.calculateAddress(chunk.data);
     dataPointAddresses[i] = dataPointAddress;
     
-    // Check if this chunk already exists in the resource
-    const existingAddress = resourceDataPointAddresses[i]?.toString();
-    if (existingAddress === dataPointAddress) {
-      console.log(`✅ Chunk ${i + 1}/${dataRegistrations.length} already exists, skipping`);
-      royalty[i] = 0n; // No cost for existing chunks
+    if(resourceDataPointAddresses.length > i) {
+      // Check if this chunk already exists in the resource
+      const existingAddress = resourceDataPointAddresses[i]?.toString() || "";
+      if (existingAddress === dataPointAddress) {
+        console.log(`✅ Chunk ${i + 1}/${dataRegistrations.length} already exists, skipping`);
+        royalty[i] = 0n; // No cost for existing chunks
+      } else {
+        // Chunk needs to be uploaded
+        chunksToUpload.push(i);
+        
+        // Get the royalty for this chunk
+        royalty[i] = await dpr.getDataPointRoyalty(dataPointAddress);
+        totalRoyalty += royalty[i];
+        
+        console.log(`📤 Chunk ${i + 1}/${dataRegistrations.length}: ${ethers.formatEther(royalty[i])} ETH`);
+      }
+    
     } else {
       // Chunk needs to be uploaded
       chunksToUpload.push(i);
@@ -368,7 +380,7 @@ export async function uploadFile(
         value: royalty[chunkIndex],
         ...currentGasSettings
       });
-      await tx.wait();
+      await tx.wait(2);
       console.log(`✅ Chunk ${chunkIndex + 1} uploaded successfully (${ethers.formatEther(royalty[chunkIndex])} ETH)`);
     } catch (error) {
       console.error(`❌ Failed to upload chunk ${chunkIndex + 1}:`, error);
