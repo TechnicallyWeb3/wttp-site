@@ -11,6 +11,7 @@ interface FormField {
   required: boolean;
   placeholder?: string;
   order: number;
+  options?: { label: string; value: string; selected?: boolean }[];
 }
 
 interface NinjaForm {
@@ -224,6 +225,9 @@ class NinjaFormsFixer {
             if (settings.formContentData && Array.isArray(settings.formContentData)) {
               // Convert formContentData array to field objects  
               parsedFields = this.parseFormContentData(settings.formContentData);
+              console.log(`🔍 DEBUG: Using formContentData approach - found ${parsedFields.length} fields`);
+              console.log(`🔍 DEBUG: formContentData keys:`, settings.formContentData);
+              console.log(`🔍 DEBUG: Parsed field types:`, parsedFields.map(f => `${f.key}:${f.type}`));
             }
             
             if (parsedFields.length > 0) {
@@ -238,6 +242,95 @@ class NinjaFormsFixer {
           }
         } catch (error) {
           console.warn(`⚠️  Error parsing form data in ${htmlFile}:`, error);
+        }
+      }
+      
+      // Also look for form.fields array specifically (this contains full field definitions)
+      console.log(`🔍 DEBUG: Looking for form.fields array in ${path.relative(this.sitePath, htmlFile)}`);
+      const fieldsStartRegex = /form\.fields\s*=\s*\[/g;
+      let fieldsMatch;
+      fieldsStartRegex.lastIndex = 0;
+      while ((fieldsMatch = fieldsStartRegex.exec(content)) !== null) {
+        console.log(`🔍 DEBUG: Found form.fields array at position ${fieldsMatch.index}`);
+        try {
+          // Find the matching closing bracket
+          const startPos = fieldsMatch.index + fieldsMatch[0].length - 1; // Position of opening [
+          let bracketCount = 1;
+          let endPos = startPos + 1;
+          
+          while (endPos < content.length && bracketCount > 0) {
+            const char = content[endPos];
+            if (char === '[') bracketCount++;
+            else if (char === ']') bracketCount--;
+            endPos++;
+          }
+          
+          if (bracketCount === 0) {
+            // Found matching bracket, extract the array
+            const fieldsStr = content.substring(startPos, endPos);
+            console.log(`🔍 DEBUG: Extracted form.fields array (${fieldsStr.length} chars)`);
+            console.log(`🔍 DEBUG: First 500 chars: ${fieldsStr.substring(0, 500)}`);
+            console.log(`🔍 DEBUG: Last 200 chars: ${fieldsStr.substring(fieldsStr.length - 200)}`);
+            
+            const fields = this.safeJsonParse(fieldsStr);
+            console.log(`🔍 DEBUG: JSON parse result:`, fields ? `${fields.length} fields` : 'FAILED');
+            if (!fields) {
+              console.log(`🔍 DEBUG: Raw extracted string for manual inspection:`);
+              console.log(`🔍 DEBUG: "${fieldsStr.substring(0, 1000)}..."`);
+            }
+          
+            if (fields && Array.isArray(fields)) {
+              console.log(`🔍 DEBUG: Successfully parsed ${fields.length} fields from form.fields array`);
+              fields.forEach((field, idx) => {
+                console.log(`🔍 DEBUG: Field ${idx}: type="${field.type}", key="${field.key}", options=${field.options?.length || 0}`);
+              });
+              
+            // Find the corresponding form ID by looking for form.id in the same script block
+            console.log(`🔍 DEBUG: Searching for form.id near position ${fieldsMatch.index}`);
+            const formIdRegex = /form\.id\s*=\s*['"](\d+)['"];/;
+            const contextStart = Math.max(0, fieldsMatch.index - 50000); // Look back 50000 chars for context
+            const contextEnd = Math.min(content.length, fieldsMatch.index + fieldsMatch[0].length + 1000); // Look ahead 1000 chars
+            const contextStr = content.substring(contextStart, contextEnd);
+            console.log(`🔍 DEBUG: Context string (${contextStr.length} chars): "${contextStr.substring(0, 200)}..."`);
+            
+            const idMatch = formIdRegex.exec(contextStr);
+            console.log(`🔍 DEBUG: Form ID regex match result: ${idMatch ? `found ID "${idMatch[1]}"` : 'NOT FOUND'}`);
+            
+            if (idMatch) {
+              const formId = idMatch[1];
+              
+              // Find title from the same context
+              const titleRegex = /"(?:title|form_title)":\s*"([^"]+)"/;
+              const titleMatch = titleRegex.exec(contextStr);
+              const formTitle = titleMatch ? titleMatch[1] : 'Contact Form';
+              
+              const parsedFields = this.parseFormFields(fields);
+              
+              // Check if we already have this form from the new format processing
+              console.log(`🔍 DEBUG: Looking for existing form with ID "${formId}". Current forms: ${this.formsFound.map(f => f.id).join(', ')}`);
+              const existingForm = this.formsFound.find(f => f.id === formId);
+              console.log(`🔍 DEBUG: Existing form found: ${existingForm ? 'YES' : 'NO'}`);
+              
+              if (existingForm) {
+                // Replace with more complete field data
+                console.log(`🔍 DEBUG: BEFORE update - existing form has ${existingForm.fields.length} fields with types: ${existingForm.fields.map(f => f.type).join(', ')}`);
+                existingForm.fields = parsedFields;
+                console.log(`🔍 DEBUG: AFTER update - existing form has ${existingForm.fields.length} fields with types: ${existingForm.fields.map(f => f.type).join(', ')}`);
+                console.log(`📋 Updated form: "${formTitle}" with complete field definitions (${parsedFields.length} fields)`);
+              } else {
+                // Add as new form
+                this.formsFound.push({
+                  id: formId,
+                  title: formTitle,
+                  fields: parsedFields
+                });
+                console.log(`📋 Found form: "${formTitle}" with ${parsedFields.length} fields in ${path.relative(this.sitePath, htmlFile)}`);
+              }
+            }
+          }
+          } // Close bracket for if (bracketCount === 0)
+        } catch (error) {
+          console.warn(`⚠️  Error parsing form.fields data in ${htmlFile}:`, error);
         }
       }
       
@@ -273,15 +366,25 @@ class NinjaFormsFixer {
 
   private safeJsonParse(jsonStr: string): any {
     try {
-      // Clean up the JSON string
-      let cleaned = jsonStr
-        .replace(/\\\//g, '/') // Fix escaped slashes
-        .replace(/\\"/g, '"')  // Fix escaped quotes
-        .replace(/(['"])?([a-zA-Z_$][a-zA-Z0-9_$]*)\1?:/g, '"$2":'); // Quote unquoted keys
+      // First try parsing without any cleaning - the form.fields array should be valid JSON
+      return JSON.parse(jsonStr);
+    } catch (e1) {
+      console.log(`🔍 DEBUG: Direct JSON.parse failed: ${e1}`);
       
-      return JSON.parse(cleaned);
-    } catch (e) {
-      // If direct parsing fails, try to extract key data manually
+      try {
+        // Clean up the JSON string
+        let cleaned = jsonStr
+          .replace(/\\\//g, '/') // Fix escaped slashes
+          .replace(/\\"/g, '"')  // Fix escaped quotes
+          .replace(/(['"])?([a-zA-Z_$][a-zA-Z0-9_$]*)\1?:/g, '"$2":'); // Quote unquoted keys
+        
+        console.log(`🔍 DEBUG: Trying with cleaned JSON...`);
+        return JSON.parse(cleaned);
+      } catch (e2) {
+        console.log(`🔍 DEBUG: Cleaned JSON.parse failed: ${e2}`);
+      }
+      
+      // If both parsing attempts fail, try to extract key data manually
       if (jsonStr.includes('"formContentData"')) {
         const formContentMatch = jsonStr.match(/"formContentData":\s*(\[.*?\])/);
         const titleMatch = jsonStr.match(/"title":\s*"([^"]+)"/);
@@ -316,6 +419,19 @@ class NinjaFormsFixer {
     for (const field of fieldsData) {
       if (field.type === 'submit') continue; // Skip submit buttons
       
+      let options: { label: string; value: string; selected?: boolean }[] | undefined;
+      
+      // Extract options for radio/select fields
+      if (field.type === 'listradio' || field.type === 'select') {
+        if (field.options && Array.isArray(field.options)) {
+          options = field.options.map((opt: any) => ({
+            label: opt.label || opt.text || opt.value || 'Option',
+            value: opt.value || opt.label || 'value',
+            selected: Boolean(opt.selected)
+          }));
+        }
+      }
+      
       fields.push({
         id: field.id || fields.length + 1,
         type: this.normalizeFieldType(field.type),
@@ -323,7 +439,8 @@ class NinjaFormsFixer {
         key: field.key || field.label?.toLowerCase().replace(/\s+/g, '_') || `field_${field.id}`,
         required: Boolean(field.required),
         placeholder: field.placeholder || '',
-        order: field.order || fields.length + 1
+        order: field.order || fields.length + 1,
+        options: options
       });
     }
     
@@ -334,6 +451,7 @@ class NinjaFormsFixer {
   }
 
   private parseFormContentData(formContentData: string[]): FormField[] {
+    console.log(`🔍 DEBUG: parseFormContentData - processing ${formContentData.length} field keys`);
     const fields: FormField[] = [];
     
     for (let i = 0; i < formContentData.length; i++) {
@@ -344,6 +462,8 @@ class NinjaFormsFixer {
       // Generate field info from the key
       let fieldType = 'text';
       let fieldLabel = this.generateLabelFromKey(fieldKey);
+      
+      console.log(`🔍 DEBUG: Processing field key "${fieldKey}" -> label: "${fieldLabel}", initial type: "${fieldType}"`);
       
       // Detect field type from key patterns
       if (fieldKey.includes('email')) {
@@ -356,6 +476,8 @@ class NinjaFormsFixer {
         fieldType = 'select';
       }
       
+      console.log(`🔍 DEBUG: Final field for "${fieldKey}": type="${fieldType}", label="${fieldLabel}"`);
+      
       fields.push({
         id: i + 1,
         type: fieldType,
@@ -367,6 +489,7 @@ class NinjaFormsFixer {
       });
     }
     
+    console.log(`🔍 DEBUG: parseFormContentData complete - returning ${fields.length} fields`);
     return fields;
   }
 
@@ -393,7 +516,9 @@ class NinjaFormsFixer {
       'textarea': 'textarea',
       'number': 'number',
       'url': 'url',
-      'date': 'date'
+      'date': 'date',
+      'listradio': 'radio',
+      'select': 'select'
     };
     
     return typeMap[type] || 'text';
@@ -542,7 +667,8 @@ class NinjaFormsFixer {
 }
 
 .form-field input,
-.form-field textarea {
+.form-field textarea,
+.form-field select {
   width: 100%;
   padding: 12px;
   border: 1px solid #ddd;
@@ -553,10 +679,43 @@ class NinjaFormsFixer {
 }
 
 .form-field input:focus,
-.form-field textarea:focus {
+.form-field textarea:focus,
+.form-field select:focus {
   outline: none;
   border-color: #007cba;
   box-shadow: 0 0 0 2px rgba(0, 124, 186, 0.1);
+}
+
+.radio-group fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.radio-group legend {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #333;
+  font-size: inherit;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.radio-option input[type="radio"] {
+  width: auto;
+  margin-right: 8px;
+  margin-bottom: 0;
+}
+
+.radio-option label {
+  margin: 0;
+  font-weight: normal;
+  cursor: pointer;
 }
 
 .form-field textarea {
@@ -681,6 +840,8 @@ async function submitContactForm(event, formId) {
   }
 
   private generateFieldHtml(field: FormField): string {
+    console.log(`🔍 DEBUG: Generating HTML for field "${field.key}" with type="${field.type}" and ${field.options?.length || 0} options`);
+    
     const requiredAttr = field.required ? 'required' : '';
     const requiredMark = field.required ? '<span class="required">*</span>' : '';
     const placeholder = field.placeholder ? `placeholder="${field.placeholder}"` : '';
@@ -695,6 +856,50 @@ async function submitContactForm(event, formId) {
         ${placeholder}
         ${requiredAttr}
       ></textarea>
+    </div>`;
+    } else if (field.type === 'radio' && field.options) {
+      // Generate radio button group
+      const radioOptions = field.options.map((option, index) => {
+        const checked = option.selected ? 'checked' : '';
+        return `
+        <div class="radio-option">
+          <input 
+            type="radio" 
+            id="${field.key}_${index}" 
+            name="${field.key}" 
+            value="${option.value}"
+            ${checked}
+            ${requiredAttr}
+          />
+          <label for="${field.key}_${index}">${option.label}</label>
+        </div>`;
+      }).join('');
+      
+      return `
+    <div class="form-field radio-group">
+      <fieldset>
+        <legend>${field.label}${requiredMark}</legend>
+        ${radioOptions}
+      </fieldset>
+    </div>`;
+    } else if (field.type === 'select' && field.options) {
+      // Generate select dropdown
+      const selectOptions = field.options.map(option => {
+        const selected = option.selected ? 'selected' : '';
+        return `<option value="${option.value}" ${selected}>${option.label}</option>`;
+      }).join('');
+      
+      return `
+    <div class="form-field">
+      <label for="${field.key}">${field.label}${requiredMark}</label>
+      <select 
+        id="${field.key}" 
+        name="${field.key}" 
+        ${requiredAttr}
+      >
+        <option value="">Please select...</option>
+        ${selectOptions}
+      </select>
     </div>`;
     } else {
       return `
