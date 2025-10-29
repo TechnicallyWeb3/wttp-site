@@ -275,6 +275,7 @@ class WordPressMinimizer {
     const unusedFiles = this.getUnusedFiles();
     let deletedCount = 0;
     let deletedSize = 0;
+    const affectedDirectories = new Set<string>();
 
     console.log(`🗑️  Deleting ${unusedFiles.length} unused files...`);
     
@@ -285,13 +286,81 @@ class WordPressMinimizer {
           fs.unlinkSync(fullPath);
           deletedCount++;
           deletedSize += file.size;
+          
+          // Track the directory that contained this file
+          const dir = path.dirname(file.path);
+          if (dir !== '.' && dir !== '') {
+            affectedDirectories.add(dir);
+          }
         }
       } catch (error) {
         console.warn(`⚠️  Could not delete ${file.path}: ${error}`);
       }
     }
 
-    console.log(`✅ Deleted ${deletedCount} files, saved ${this.formatBytes(deletedSize)}`);
+    // Clean up empty directories
+    const deletedDirectories = await this.deleteEmptyDirectories(affectedDirectories);
+
+    console.log(`✅ Deleted ${deletedCount} files and ${deletedDirectories} empty folders, saved ${this.formatBytes(deletedSize)}`);
+  }
+
+  private async deleteEmptyDirectories(affectedDirectories: Set<string>): Promise<number> {
+    let deletedDirectoryCount = 0;
+    
+    // Sort directories by depth (deepest first) to ensure we delete child directories before parents
+    const sortedDirectories = Array.from(affectedDirectories).sort((a, b) => {
+      const depthA = a.split(path.sep).length;
+      const depthB = b.split(path.sep).length;
+      return depthB - depthA; // Deepest first
+    });
+
+    for (const dir of sortedDirectories) {
+      const fullDirPath = path.join(this.sitePath, dir);
+      
+      try {
+        if (fs.existsSync(fullDirPath)) {
+          const items = fs.readdirSync(fullDirPath);
+          
+          // If directory is empty, delete it
+          if (items.length === 0) {
+            fs.rmdirSync(fullDirPath);
+            deletedDirectoryCount++;
+            
+            if (process.env.DEBUG_WP_MINIMIZE) {
+              console.log(`📂 Deleted empty directory: ${dir}`);
+            }
+            
+            // Check if parent directory is now empty too
+            const parentDir = path.dirname(dir);
+            if (parentDir !== '.' && parentDir !== '' && parentDir !== dir) {
+              affectedDirectories.add(parentDir);
+            }
+          }
+        }
+      } catch (error) {
+        if (process.env.DEBUG_WP_MINIMIZE) {
+          console.warn(`⚠️  Could not delete directory ${dir}: ${error}`);
+        }
+      }
+    }
+    
+    // If we deleted directories, recursively check for more empty parent directories
+    if (deletedDirectoryCount > 0) {
+      const remainingDirectories = new Set<string>();
+      for (const dir of affectedDirectories) {
+        const parentDir = path.dirname(dir);
+        if (parentDir !== '.' && parentDir !== '' && parentDir !== dir) {
+          remainingDirectories.add(parentDir);
+        }
+      }
+      
+      if (remainingDirectories.size > 0) {
+        const additionalDeleted = await this.deleteEmptyDirectories(remainingDirectories);
+        deletedDirectoryCount += additionalDeleted;
+      }
+    }
+    
+    return deletedDirectoryCount;
   }
 
   private formatBytes(bytes: number): string {
