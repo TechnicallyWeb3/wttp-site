@@ -34,4 +34,11 @@ export const siteDeployments = {
     }
 };
 
+// 🎉 Deployment Summary:
+// ==================================================
+// Web3Site: 0x64ADF744466E2b9D299c7CCB91a8a34ADB23650B
+// Owner: 0xDA00006427E534B1Acde93B9E66d8A9d2C66B2d3
+// DPR: 0xDA7Ae59Fa1DB9B138dddaaFB6153B11B162Cfd8B
+// Transaction: 0x3d28a13742a2d47134fa9d597f724a06163eceb6eee38fab11603a2fe8c44c11
+
 export default siteDeployments; 

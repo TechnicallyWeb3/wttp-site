@@ -20,18 +20,19 @@
 pragma solidity ^0.8.20;
 
 import "./BaseWTTPStorage.sol";
+import "./BaseWTTPPermissions.sol";
 
 /// @title WTTP Base Site Contract
 /// @author Web3 Transfer Protocol (WTTP) Development Team
 /// @notice Implements core WTTP protocol methods for HTTP-like operations on blockchain
 /// @dev Extends WTTPBaseStorage to provide web-like interactions with blockchain resources
-abstract contract BaseWTTPSite is BaseWTTPStorage {
+abstract contract BaseWTTPSite is BaseWTTPPermissions, BaseWTTPStorage {
 
     constructor(
         address _owner,
         address _dpr,
         HeaderInfo memory _defaultHeader
-    ) BaseWTTPStorage(_owner, _dpr) {
+    ) BaseWTTPStorage(_dpr) BaseWTTPPermissions(_owner) {
         _setDefaultHeader(_defaultHeader);
     }
 

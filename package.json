@@ -1,6 +1,6 @@
 {
   "name": "wttp-site",
-  "version": "0.3.0",
+  "version": "0.4.3",
   "description": "Web3 Transfer Protocol (WTTP) - Site Contracts and deployment tools",
   "main": "./dist/cjs/src/index.js",
   "module": "./dist/esm/src/index.js",
@@ -29,11 +29,13 @@
       "require": "./dist/cjs/src/types/index.js",
       "types": "./dist/types/src/types/index.d.ts"
     },
-    "./contracts/*": "./contracts/*"
+    "./contracts/*": "./contracts/*",
+    "./artifacts/*": "./artifacts/*"
   },
   "files": [
     "dist/",
     "typechain-types/",
+    "artifacts/",
     "README.md",
     "LICENSE",
     "LLM_CONTEXT.md",
@@ -42,7 +44,8 @@
     "contracts/extensions/",
     "contracts/BaseWTTPPermissions.sol",
     "contracts/BaseWTTPStorage.sol",
-    "contracts/BaseWTTPSite.sol"
+    "contracts/BaseWTTPSite.sol",
+    "contracts/Web3Site.sol"
   ],
   "scripts": {
     "test": "npm run test:setup && npx hardhat test && npm run test:cleanup",
@@ -95,7 +98,7 @@
     "shx": "^0.3.4"
   },
   "dependencies": {
-    "@wttp/core": "^0.5.2",
+    "@wttp/core": "^1.0.1",
     "hardhat": "^2.24.2"
   }
 }

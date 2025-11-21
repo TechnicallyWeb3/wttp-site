@@ -19,14 +19,14 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.20;
 
-import "./BaseWTTPPermissions.sol";
+import "@wttp/core/contracts/types/WTTPTypes.sol";
 
 /// @title WTTP Base Storage Contract
 /// @author Web3 Transfer Protocol (WTTP) Development Team
 /// @notice Manages web resource storage and access control
-/// @dev Core storage functionality for the WTTP protocol, inheriting permission management
+/// @dev Core storage functionality for the WTTP protocol
 ///      Resources are stored as chunks of data points with associated metadata and headers
-abstract contract BaseWTTPStorage is BaseWTTPPermissions {
+abstract contract BaseWTTPStorage {
 
     /// @notice Empty header structure for initialization and reset operations
     HeaderInfo zeroHeader;
@@ -38,12 +38,10 @@ abstract contract BaseWTTPStorage is BaseWTTPPermissions {
 
     /// @notice Initializes the storage contract with core dependencies and defaults
     /// @dev Sets up the data point registry and default header
-    /// @param _owner Address that will receive the DEFAULT_ADMIN_ROLE
     /// @param _dpr Address of the Data Point Registry contract
     constructor(
-        address _owner,
         address _dpr
-    ) BaseWTTPPermissions(_owner) {
+    ) {
         DPR_ = IDataPointRegistry(_dpr);
     }
 

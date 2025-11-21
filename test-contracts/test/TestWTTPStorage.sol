@@ -2,10 +2,11 @@
 pragma solidity ^0.8.20;
 
 import "../../contracts/BaseWTTPStorage.sol";
+import "../../contracts/BaseWTTPPermissions.sol";
 
-contract TestWTTPStorage is BaseWTTPStorage {
+contract TestWTTPStorage is BaseWTTPPermissions, BaseWTTPStorage {
 
-    constructor(address _owner, address _dpr) BaseWTTPStorage(_owner, _dpr) {}
+    constructor(address _owner, address _dpr) BaseWTTPStorage(_dpr) BaseWTTPPermissions(_owner) {}
 
     function testZeroHeader() public view returns (HeaderInfo memory) {
         return zeroHeader;
