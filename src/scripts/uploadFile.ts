@@ -13,8 +13,9 @@ import { fetchResource } from "./fetchResource";
 
 // Constants
 const CHUNK_SIZE = 32 * 1024; // 32KB chunks
-const WTTP_FILE_WARN = 100 * 1024 * 1024; // 100MB warning
-const WTTP_FILE_LIMIT = 400 * 1024 * 1024; // 400MB limit
+const DEFAULT_FILE_WARN = 100 * 1024 * 1024; // 100MB warning
+const DEFAULT_FILE_LIMIT = 400 * 1024 * 1024; // 400MB limit
+const DEFAULT_GAS_LIMIT = 300; // Default gas limit in gwei
 
 // Helper function to loosely compare two objects
 export function looseEqual(obj1: any, obj2: any): boolean {
@@ -93,6 +94,49 @@ export function getMimeTypeWithCharset(filePath: string): { mimeType: string; ch
   };
 }
 
+// Helper function to get chain currency symbol (POL for Polygon, ETH otherwise)
+export async function getChainSymbol(): Promise<string> {
+  try {
+    const network = await ethers.provider.getNetwork();
+    return network.chainId === 137n ? "POL" : "ETH";
+  } catch (error) {
+    // Default to ETH if we can't detect network
+    return "ETH";
+  }
+}
+
+// Helper function to wait until gas price is below the specified limit
+export async function waitForGasPriceBelowLimit(gasLimitGwei: number, checkIntervalMs: number = 10000): Promise<void> {
+  const gasLimit = ethers.parseUnits(gasLimitGwei.toString(), "gwei");
+  
+  while (true) {
+    try {
+      const feeData = await ethers.provider.getFeeData();
+      let currentGasPrice: bigint;
+      
+      if (feeData.gasPrice) {
+        currentGasPrice = feeData.gasPrice;
+      } else if (feeData.maxFeePerGas) {
+        currentGasPrice = feeData.maxFeePerGas;
+      } else {
+        console.warn("⚠️ Could not fetch gas price, proceeding anyway");
+        return;
+      }
+      
+      if (currentGasPrice <= gasLimit) {
+        console.log(`✅ Gas price is below limit: ${ethers.formatUnits(currentGasPrice, "gwei")} gwei <= ${gasLimitGwei} gwei`);
+        return;
+      }
+      
+      console.log(`⏳ Gas price (${ethers.formatUnits(currentGasPrice, "gwei")} gwei/${ethers.formatUnits(feeData.maxFeePerGas ?? 9n, "gwei")} gwei) is above limit (${gasLimitGwei} gwei), waiting ${checkIntervalMs/1000}s...`);
+      await new Promise(resolve => setTimeout(resolve, checkIntervalMs));
+    } catch (error) {
+      console.warn("⚠️ Error checking gas price, proceeding anyway:", error);
+      return;
+    }
+  }
+}
+
 // Helper function to get dynamic gas settings based on current network conditions
 export async function getDynamicGasSettings() {
   try {
@@ -143,7 +187,7 @@ export async function getDynamicGasSettings() {
 }
 
 // Helper function to get gas price for estimation (custom or multiply current by rate, with optional minimum)
-export async function getEstimationGasPrice(customGasPriceGwei?: number, rate: number = 2.0, minGasPriceGwei: number = 150): Promise<bigint> {
+export async function getEstimationGasPrice(customGasPriceGwei?: number, rate: number = 2, minGasPriceGwei: number = 150): Promise<bigint> {
   if (customGasPriceGwei !== undefined) {
     return ethers.parseUnits(customGasPriceGwei.toString(), "gwei");
   }
@@ -183,9 +227,14 @@ export async function getEstimationGasPrice(customGasPriceGwei?: number, rate: n
 export async function uploadFile(
   wttpSite: IBaseWTTPSite,
   sourcePath: string,
-  destinationPath: string
+  destinationPath: string,
+  fileLimitBytes?: number,
+  gasLimitGwei?: number
 ) {
   console.log(`🚀 Starting upload: ${sourcePath} → ${destinationPath}`);
+  
+  // Get currency symbol early
+  const currencySymbol = await getChainSymbol();
   
   // Parameter validation
   if (!wttpSite) {
@@ -218,15 +267,19 @@ export async function uploadFile(
   
   console.log(`📁 File size: ${fileData.length} bytes`);
   
+  // Use provided file limits or defaults
+  const fileWarn = fileLimitBytes ? fileLimitBytes * 0.25 : DEFAULT_FILE_WARN; // 25% of limit as warning
+  const fileLimit = fileLimitBytes || DEFAULT_FILE_LIMIT;
+  
   // Validate file size
   if (fileData.length === 0) {
     throw new Error("Cannot upload empty file");
   }
-  if (fileData.length > WTTP_FILE_WARN) { // 100MB limit
-    if (fileData.length > WTTP_FILE_LIMIT) {
-      throw new Error("❌  File size exceeds 400MB limit. Upload aborted.");
+  if (fileData.length > fileWarn) {
+    if (fileData.length > fileLimit) {
+      throw new Error(`❌  File size exceeds ${fileLimit / (1024 * 1024)}MB limit. Upload aborted.`);
     }
-    console.warn("⚠️  Large file detected (>100MB). Upload may take significant time and gas.");
+    console.warn(`⚠️  Large file detected (>${fileWarn / (1024 * 1024)}MB). Upload may take significant time and gas.`);
   }
 
   // let resourceExists = false;
@@ -297,7 +350,7 @@ export async function uploadFile(
         royalty[i] = await dpr.getDataPointRoyalty(dataPointAddress);
         totalRoyalty += royalty[i];
         
-        console.log(`📤 Chunk ${i + 1}/${dataRegistrations.length}: ${ethers.formatEther(royalty[i])} ETH`);
+        console.log(`📤 Chunk ${i + 1}/${dataRegistrations.length}: ${ethers.formatEther(royalty[i])} ${currencySymbol}`);
       }
     
     } else {
@@ -308,18 +361,22 @@ export async function uploadFile(
       royalty[i] = await dpr.getDataPointRoyalty(dataPointAddress);
       totalRoyalty += royalty[i];
       
-      console.log(`📤 Chunk ${i + 1}/${dataRegistrations.length}: ${ethers.formatEther(royalty[i])} ETH`);
+      console.log(`📤 Chunk ${i + 1}/${dataRegistrations.length}: ${ethers.formatEther(royalty[i])} ${currencySymbol}`);
     }
   }
   
-  console.log(`💰 Total royalty required: ${ethers.formatEther(totalRoyalty)} ETH`);
+  console.log(`💰 Total royalty required: ${ethers.formatEther(totalRoyalty)} ${currencySymbol}`);
   console.log(`📋 Chunks to upload: ${chunksToUpload.length}/${dataRegistrations.length}`);
   
   // Check if user has sufficient balance
   const balance = await ethers.provider.getBalance(signerAddress);
   if (balance < totalRoyalty) {
-    throw new Error(`Insufficient balance. Required: ${ethers.formatEther(totalRoyalty)} ETH, Available: ${ethers.formatEther(balance)} ETH`);
+    throw new Error(`Insufficient balance. Required: ${ethers.formatEther(totalRoyalty)} ${currencySymbol}, Available: ${ethers.formatEther(balance)} ${currencySymbol}`);
   }
+  
+  // Track gas and royalties for summary
+  let totalGasUsed = 0n;
+  let totalRoyaltiesSpent = 0n;
 
     
   // Get MIME type and charset
@@ -328,6 +385,12 @@ export async function uploadFile(
   const mimeTypeBytes2 = encodeMimeType(mimeType);
   const charsetBytes2 = charset ? encodeCharset(charset) : encodeCharset("");
 
+  // Wait for gas price to be below limit if specified
+  if (gasLimitGwei !== undefined) {
+    console.log(`⏳ Waiting for gas price to drop below ${gasLimitGwei} gwei...`);
+    await waitForGasPriceBelowLimit(gasLimitGwei);
+  }
+  
   // Gas optimization settings for faster transactions
   const gasSettings = await getDynamicGasSettings();
 
@@ -376,13 +439,18 @@ export async function uploadFile(
       console.log("📊 Calculating royalty for chunk 0 (needed for PUT with unchanged data)...");
       royalty[0] = await dpr.getDataPointRoyalty(dataPointAddresses[0]);
       totalRoyalty += royalty[0];
-      console.log(`💰 Additional royalty for PUT: ${ethers.formatEther(royalty[0])} ETH`);
+      console.log(`💰 Additional royalty for PUT: ${ethers.formatEther(royalty[0])} ${currencySymbol}`);
       
       // Re-check balance with updated royalty
       const balance = await ethers.provider.getBalance(signerAddress);
       if (balance < totalRoyalty) {
-        throw new Error(`Insufficient balance after adding PUT royalty. Required: ${ethers.formatEther(totalRoyalty)} ETH, Available: ${ethers.formatEther(balance)} ETH`);
+        throw new Error(`Insufficient balance after adding PUT royalty. Required: ${ethers.formatEther(totalRoyalty)} ${currencySymbol}, Available: ${ethers.formatEther(balance)} ${currencySymbol}`);
       }
+    }
+    
+    // Wait for gas price to be below limit if specified (before PUT)
+    if (gasLimitGwei !== undefined) {
+      await waitForGasPriceBelowLimit(gasLimitGwei);
     }
     
     console.log(`🚀 Sending PUT transaction with optimized gas settings...`);
@@ -390,7 +458,11 @@ export async function uploadFile(
       value: royalty[0],
       ...gasSettings // TODO: Uncomment this when gas settings are working
     });
-    await tx.wait();
+    const receipt = await tx.wait();
+    if (receipt) {
+      totalGasUsed += receipt.gasUsed;
+      totalRoyaltiesSpent += royalty[0];
+    }
     console.log("✅ PUT transaction completed - file properties and first chunk updated");
     
     // Remove chunk 0 from PATCH list if it was there
@@ -417,8 +489,12 @@ export async function uploadFile(
         value: royalty[chunkIndex],
         ...currentGasSettings
       });
-      await tx.wait(2);
-      console.log(`✅ Chunk ${chunkIndex + 1} uploaded successfully (${ethers.formatEther(royalty[chunkIndex])} ETH)`);
+      const receipt = await tx.wait(2);
+      if (receipt) {
+        totalGasUsed += receipt.gasUsed;
+        totalRoyaltiesSpent += royalty[chunkIndex];
+      }
+      console.log(`✅ Chunk ${chunkIndex + 1} uploaded successfully (${ethers.formatEther(royalty[chunkIndex])} ${currencySymbol})`);
     } catch (error) {
       console.error(`❌ Failed to upload chunk ${chunkIndex + 1}:`, error);
       throw new Error(`Upload failed at chunk ${chunkIndex + 1}: ${error}`);
@@ -450,6 +526,33 @@ export async function uploadFile(
     console.log(`File size: ${fetchSize} bytes`);
     
   }
+  
+  // Calculate summary statistics
+  const fileSizeMB = fileData.length / (1024 * 1024);
+  const feeData = await ethers.provider.getFeeData();
+  const effectiveGasPrice = feeData.gasPrice || feeData.maxFeePerGas || ethers.parseUnits("20", "gwei");
+  const totalGasCost = totalGasUsed * effectiveGasPrice;
+  const costPerMBWei = fileSizeMB > 0 ? (totalGasCost * BigInt(1e18)) / BigInt(Math.floor(fileSizeMB * 1e18)) : 0n;
+  
+  // Build options string
+  const options: string[] = [];
+  if (fileLimitBytes !== undefined) {
+    options.push(`filelimit=${Math.floor(fileLimitBytes / (1024 * 1024))}MB`);
+  }
+  if (gasLimitGwei !== undefined) {
+    options.push(`gaslimit=${gasLimitGwei}gwei`);
+  }
+  
+  console.log(`\n📊 Upload Summary:`);
+  console.log(`   Total gas used: ${totalGasUsed.toString()}`);
+  console.log(`   Total royalties spent: ${ethers.formatEther(totalRoyaltiesSpent)} ${currencySymbol}`);
+  console.log(`   Total gas cost: ${ethers.formatEther(totalGasCost)} ${currencySymbol}`);
+  console.log(`   Total cost: ${ethers.formatEther(totalGasCost + totalRoyaltiesSpent)} ${currencySymbol}`);
+  console.log(`   Cost per MB: ${fileSizeMB > 0 ? ethers.formatEther(costPerMBWei) : "0"} ${currencySymbol}/MB`);
+  if (options.length > 0) {
+    console.log(`   Options: ${options.join(", ")}`);
+  }
+  
   return fetchResult;
 }
 
@@ -469,7 +572,7 @@ export async function estimateFile(
   sourcePath: string,
   destinationPath: string,
   gasPriceGwei?: number,
-  rate: number = 2.0,
+  rate: number = 2,
   minGasPriceGwei: number = 150
 ): Promise<FileEstimateResult> {
   console.log(`📊 Estimating gas for: ${sourcePath} → ${destinationPath}`);
@@ -659,10 +762,8 @@ export async function estimateFile(
   const fileSizeMB = fileData.length / (1024 * 1024);
   const costPerMBWei = fileSizeMB > 0 ? (totalCost * BigInt(1e18)) / BigInt(Math.floor(fileSizeMB * 1e18)) : 0n;
   
-  // Get network info for currency symbol
-  const network = await ethers.provider.getNetwork();
-  const isPolygon = network.chainId === 137n;
-  const currencySymbol = isPolygon ? "POL" : "ETH";
+  // Get currency symbol
+  const currencySymbol = await getChainSymbol();
   
   console.log(`\n📊 Estimation Summary:`);
   console.log(`   Total gas: ${totalGas.toString()}`);

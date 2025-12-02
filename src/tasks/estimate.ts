@@ -28,8 +28,8 @@ task("site:estimate", "Estimate gas costs for uploading a file or directory to a
   .addOptionalParam("site", "The address of the WTTP site (uses default empty contract if not provided)")
   .addOptionalParam("destination", "The destination path on the WTTP site (auto-generated from source if not provided)")
   .addOptionalParam("gasprice", "Custom gas price in gwei (otherwise uses current price multiplied by rate)", undefined, types.int)
-  .addOptionalParam("rate", "Multiplier rate for current gas price (default: 2.0, accepts decimals like 1.5)", "2.0", types.float)
-  .addOptionalParam("min", "Minimum gas price in gwei (default: 150)", "150", types.float)
+  .addOptionalParam("rate", "Multiplier rate for current gas price (default: 2, accepts decimals like 1.5)", 2, types.float)
+  .addOptionalParam("min", "Minimum gas price in gwei (default: 150)", 150, types.float)
   .addOptionalParam("nodefaults", "Disable default ignore patterns", false, types.boolean)
   .setAction(async (taskArgs, hre) => {
     const { site, source, destination, gasprice, rate, min, nodefaults } = taskArgs;
@@ -75,10 +75,9 @@ task("site:estimate", "Estimate gas costs for uploading a file or directory to a
       // Estimate the directory
       const result = await estimateDirectory(wtppSite, source, destPath, gasprice, ignoreOptions, parseFloat(rate), parseFloat(min));
       
-      // Get network info for currency symbol
-      const network = await hre.ethers.provider.getNetwork();
-      const isPolygon = network.chainId === 137n;
-      const currencySymbol = isPolygon ? "POL" : "ETH";
+      // Get currency symbol
+      const { getChainSymbol } = require("../scripts/uploadFile");
+      const currencySymbol = await getChainSymbol();
       
       console.log(`\n✅ Estimation complete!`);
       console.log(`   Total cost: ${hre.ethers.formatEther(result.totalCost)} ${currencySymbol}`);
@@ -92,10 +91,9 @@ task("site:estimate", "Estimate gas costs for uploading a file or directory to a
       // Estimate the file
       const result = await estimateFile(wtppSite, source, destPath, gasprice, parseFloat(rate), parseFloat(min));
       
-      // Get network info for currency symbol
-      const network = await hre.ethers.provider.getNetwork();
-      const isPolygon = network.chainId === 137n;
-      const currencySymbol = isPolygon ? "POL" : "ETH";
+      // Get currency symbol
+      const { getChainSymbol } = require("../scripts/uploadFile");
+      const currencySymbol = await getChainSymbol();
       
       console.log(`\n✅ Estimation complete!`);
       console.log(`   Total cost: ${hre.ethers.formatEther(result.totalCost)} ${currencySymbol}`);

@@ -8,7 +8,7 @@ import {
   HEADRequestStruct, 
   normalizePath 
 } from "@wttp/core";
-import { getMimeType, uploadFile, getDynamicGasSettings, looseEqual, estimateFile, FileEstimateResult, getEstimationGasPrice } from "./uploadFile";
+import { getMimeType, uploadFile, getDynamicGasSettings, looseEqual, estimateFile, FileEstimateResult, getEstimationGasPrice, waitForGasPriceBelowLimit, getChainSymbol } from "./uploadFile";
 import { fetchResource } from "./fetchResource";
 import { createWTTPIgnore, WTTPIgnoreOptions } from "./wttpIgnore";
 
@@ -131,9 +131,19 @@ export async function uploadDirectory(
   wttpSite: IBaseWTTPSite,
   sourcePath: string,
   destinationPath: string,
-  ignoreOptions?: WTTPIgnoreOptions
+  ignoreOptions?: WTTPIgnoreOptions,
+  fileLimitBytes?: number,
+  gasLimitGwei?: number
 ) {
   console.log(`🚀 Starting directory upload: ${sourcePath} → ${destinationPath}`);
+  
+  // Get currency symbol
+  const currencySymbol = await getChainSymbol();
+  
+  // Track gas and royalties for summary
+  let totalGasUsed = 0n;
+  let totalRoyaltiesSpent = 0n;
+  let totalFileSize = 0;
   
   // Parameter validation
   if (!fs.existsSync(sourcePath)) {
@@ -174,7 +184,7 @@ export async function uploadDirectory(
       fs.writeFileSync(tempMetadataPath, directoryMetadataJson);
       // the directory listing is too large, so we need to upload it as a file
       // can be done async in background
-      await uploadFile(wttpSite, tempMetadataPath, destinationPath);
+      await uploadFile(wttpSite, tempMetadataPath, destinationPath, fileLimitBytes, gasLimitGwei);
     }
   }
   
@@ -250,6 +260,12 @@ export async function uploadDirectory(
     // Upload the directory metadata with redirect header
     console.log("Uploading directory metadata with redirect header...");
     
+    // Wait for gas price to be below limit if specified
+    if (gasLimitGwei !== undefined) {
+      console.log(`⏳ Waiting for gas price to drop below ${gasLimitGwei} gwei...`);
+      await waitForGasPriceBelowLimit(gasLimitGwei);
+    }
+    
     // Get dynamic gas settings for optimized transaction speed
     const gasSettings = await getDynamicGasSettings();
     
@@ -266,7 +282,10 @@ export async function uploadDirectory(
       
     console.log(`🚀 Sending DEFINE transaction with optimized gas settings...`);
     const defineTx = await wttpSite.DEFINE(defineRequest, gasSettings);
-    await defineTx.wait();
+    const defineReceipt = await defineTx.wait();
+    if (defineReceipt) {
+      totalGasUsed += defineReceipt.gasUsed;
+    }
     console.log(`Directory ${destinationPath} created successfully!`);
   }
   
@@ -291,17 +310,51 @@ export async function uploadDirectory(
     try {
       if (isDirectory(fullSourcePath)) {
         // Recursively handle subdirectories
-        await uploadDirectory(wttpSite, fullSourcePath, fullDestPath, ignoreOptions);
+        // Note: Subdirectories will track their own gas/royalties, but we can't easily aggregate them
+        // The summary will be shown at each directory level
+        await uploadDirectory(wttpSite, fullSourcePath, fullDestPath, ignoreOptions, fileLimitBytes, gasLimitGwei);
       } else {
         // Upload files
         console.log(`📤 Uploading file: ${item}`);
-        await uploadFile(wttpSite, fullSourcePath, fullDestPath);
+        await uploadFile(wttpSite, fullSourcePath, fullDestPath, fileLimitBytes, gasLimitGwei);
         console.log(`✅ File uploaded successfully: ${item}`);
       }
     } catch (error) {
       console.error(`❌ Failed to upload resource ${item}:`, error);
       throw new Error(`Failed to upload resource ${item}: ${error}`);
     }
+  }
+  
+  // Calculate summary statistics for this directory level
+  const totalSizeMB = totalFileSize / (1024 * 1024);
+  const feeData = await ethers.provider.getFeeData();
+  const effectiveGasPrice = feeData.gasPrice || feeData.maxFeePerGas || ethers.parseUnits("20", "gwei");
+  const totalGasCost = totalGasUsed * effectiveGasPrice;
+  const costPerMBWei = totalSizeMB > 0 ? (totalGasCost * BigInt(1e18)) / BigInt(Math.floor(totalSizeMB * 1e18)) : 0n;
+  
+  // Build options string
+  const options: string[] = [];
+  if (fileLimitBytes !== undefined) {
+    options.push(`filelimit=${Math.floor(fileLimitBytes / (1024 * 1024))}MB`);
+  }
+  if (gasLimitGwei !== undefined) {
+    options.push(`gaslimit=${gasLimitGwei}gwei`);
+  }
+  if (ignoreOptions && !ignoreOptions.includeDefaults) {
+    options.push(`nodefaults`);
+  }
+  
+  console.log(`\n📊 Directory Upload Summary:`);
+  console.log(`   Total gas used: ${totalGasUsed.toString()}`);
+  console.log(`   Total royalties spent: ${ethers.formatEther(totalRoyaltiesSpent)} ${currencySymbol}`);
+  console.log(`   Total gas cost: ${ethers.formatEther(totalGasCost)} ${currencySymbol}`);
+  console.log(`   Total cost: ${ethers.formatEther(totalGasCost + totalRoyaltiesSpent)} ${currencySymbol}`);
+  if (totalSizeMB > 0) {
+    console.log(`   Cost per MB: ${ethers.formatEther(costPerMBWei)} ${currencySymbol}/MB`);
+    console.log(`   Total size: ${totalSizeMB.toFixed(2)} MB`);
+  }
+  if (options.length > 0) {
+    console.log(`   Options: ${options.join(", ")}`);
   }
     
   console.log(`Directory ${sourcePath} uploaded successfully to ${destinationPath}`);
@@ -326,15 +379,13 @@ export async function estimateDirectory(
   destinationPath: string,
   gasPriceGwei?: number,
   ignoreOptions?: WTTPIgnoreOptions,
-  rate: number = 2.0,
+  rate: number = 2,
   minGasPriceGwei: number = 150
 ): Promise<DirectoryEstimateResult> {
   console.log(`📊 Estimating gas for directory: ${sourcePath} → ${destinationPath}`);
   
-  // Get network info for currency symbol
-  const network = await ethers.provider.getNetwork();
-  const isPolygon = network.chainId === 137n;
-  const currencySymbol = isPolygon ? "POL" : "ETH";
+  // Get currency symbol
+  const currencySymbol = await getChainSymbol();
   
   // Parameter validation
   if (!fs.existsSync(sourcePath)) {
@@ -427,10 +478,8 @@ export async function estimateDirectory(
       fileCount++;
       fileEstimates.set(relativePath, fileEstimate);
       
-      // Get network info for currency symbol
-      const fileNetwork = await ethers.provider.getNetwork();
-      const fileIsPolygon = fileNetwork.chainId === 137n;
-      const fileCurrencySymbol = fileIsPolygon ? "POL" : "ETH";
+      // Get currency symbol
+      const fileCurrencySymbol = await getChainSymbol();
       console.log(`   ✅ Estimated: ${fileEstimate.transactionCount} transactions, ${ethers.formatEther(fileEstimate.totalCost)} ${fileCurrencySymbol}`);
     } catch (error) {
       console.error(`❌ Failed to estimate file ${relativePath}:`, error);

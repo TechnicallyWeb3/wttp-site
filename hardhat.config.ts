@@ -7,13 +7,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 // Import task definitions
-import "./src/tasks/deploy";
-import "./src/tasks/fetch";
-import "./src/tasks/upload";
-import "./src/tasks/estimate";
-import "./src/tasks/wp-minimize";
-import "./src/tasks/wp-ninja-fix";
-import "./src/tasks/wp-routes";
+import "./src/tasks";
 import { ethers } from "ethers";
 
 const mnemonic = process.env.OWNER_MNEMONIC || "test test test test test test test test test test test junk";
