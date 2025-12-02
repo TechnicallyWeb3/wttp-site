@@ -326,9 +326,15 @@ export async function estimateDirectory(
   destinationPath: string,
   gasPriceGwei?: number,
   ignoreOptions?: WTTPIgnoreOptions,
-  rate: number = 2.0
+  rate: number = 2.0,
+  minGasPriceGwei: number = 150
 ): Promise<DirectoryEstimateResult> {
   console.log(`📊 Estimating gas for directory: ${sourcePath} → ${destinationPath}`);
+  
+  // Get network info for currency symbol
+  const network = await ethers.provider.getNetwork();
+  const isPolygon = network.chainId === 137n;
+  const currencySymbol = isPolygon ? "POL" : "ETH";
   
   // Parameter validation
   if (!fs.existsSync(sourcePath)) {
@@ -345,7 +351,7 @@ export async function estimateDirectory(
   console.log(`📋 Using ${wttpIgnore.getPatterns().length} ignore patterns`);
   
   // Get gas price once for consistency
-  const gasPrice = await getEstimationGasPrice(gasPriceGwei, rate);
+  const gasPrice = await getEstimationGasPrice(gasPriceGwei, rate, minGasPriceGwei);
   console.log(`⛽ Using gas price: ${ethers.formatUnits(gasPrice, "gwei")} gwei`);
   
   let totalGas = 0n;
@@ -413,7 +419,7 @@ export async function estimateDirectory(
     
     try {
       console.log(`\n📊 Estimating: ${relativePath}`);
-      const fileEstimate = await estimateFile(wttpSite, filePath, fullDestPath, gasPriceGwei, rate);
+      const fileEstimate = await estimateFile(wttpSite, filePath, fullDestPath, gasPriceGwei, rate, minGasPriceGwei);
       
       totalGas += fileEstimate.totalGas;
       totalRoyaltyCost += fileEstimate.royaltyCost;
@@ -421,7 +427,11 @@ export async function estimateDirectory(
       fileCount++;
       fileEstimates.set(relativePath, fileEstimate);
       
-      console.log(`   ✅ Estimated: ${fileEstimate.transactionCount} transactions, ${ethers.formatEther(fileEstimate.totalCost)} ETH`);
+      // Get network info for currency symbol
+      const fileNetwork = await ethers.provider.getNetwork();
+      const fileIsPolygon = fileNetwork.chainId === 137n;
+      const fileCurrencySymbol = fileIsPolygon ? "POL" : "ETH";
+      console.log(`   ✅ Estimated: ${fileEstimate.transactionCount} transactions, ${ethers.formatEther(fileEstimate.totalCost)} ${fileCurrencySymbol}`);
     } catch (error) {
       console.error(`❌ Failed to estimate file ${relativePath}:`, error);
       // Continue with other files
@@ -432,17 +442,37 @@ export async function estimateDirectory(
   const allDirs = getAllDirectories(sourcePath, sourcePath, wttpIgnore);
   directoryCount = allDirs.length;
   
+  // Calculate total file size
+  let totalFileSize = 0;
+  for (const filePath of allFiles) {
+    try {
+      const stats = fs.statSync(filePath);
+      totalFileSize += stats.size;
+    } catch (error) {
+      // Skip files that can't be read
+    }
+  }
+  
   // Calculate total cost
   const totalCost = totalGas * gasPrice;
+  const averageGas = totalTransactions > 0 ? totalGas / BigInt(totalTransactions) : 0n;
+  
+  // Calculate cost per MB
+  const totalSizeMB = totalFileSize / (1024 * 1024);
+  const costPerMBWei = totalSizeMB > 0 ? (totalCost * BigInt(1e18)) / BigInt(Math.floor(totalSizeMB * 1e18)) : 0n;
   
   console.log(`\n📊 Directory Estimation Summary:`);
   console.log(`   Total gas: ${totalGas.toString()}`);
-  console.log(`   Total cost: ${ethers.formatEther(totalCost)} ETH`);
-  console.log(`   Total royalty cost: ${ethers.formatEther(totalRoyaltyCost)} ETH`);
+  console.log(`   Average gas per transaction: ${averageGas.toString()}`);
+  console.log(`   Total cost: ${ethers.formatEther(totalCost)} ${currencySymbol}`);
+  console.log(`   Total royalty cost: ${ethers.formatEther(totalRoyaltyCost)} ${currencySymbol}`);
+  console.log(`   Cost per MB: ${totalSizeMB > 0 ? ethers.formatEther(costPerMBWei) : "0"} ${currencySymbol}/MB`);
   console.log(`   Total transactions: ${totalTransactions}`);
   console.log(`   Files: ${fileCount}`);
   console.log(`   Directories: ${directoryCount}`);
+  console.log(`   Total size: ${totalSizeMB.toFixed(2)} MB`);
   console.log(`   Gas price: ${ethers.formatUnits(gasPrice, "gwei")} gwei`);
+  console.log(`   Settings: ${gasPriceGwei ? `gasprice=${gasPriceGwei}` : `rate=${rate}, min=${minGasPriceGwei}`}`);
   
   return {
     totalGas,

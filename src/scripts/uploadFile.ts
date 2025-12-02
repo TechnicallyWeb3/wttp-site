@@ -142,8 +142,8 @@ export async function getDynamicGasSettings() {
   }
 }
 
-// Helper function to get gas price for estimation (custom or multiply current by rate, min 150 gwei)
-export async function getEstimationGasPrice(customGasPriceGwei?: number, rate: number = 2.0): Promise<bigint> {
+// Helper function to get gas price for estimation (custom or multiply current by rate, with optional minimum)
+export async function getEstimationGasPrice(customGasPriceGwei?: number, rate: number = 2.0, minGasPriceGwei: number = 150): Promise<bigint> {
   if (customGasPriceGwei !== undefined) {
     return ethers.parseUnits(customGasPriceGwei.toString(), "gwei");
   }
@@ -169,13 +169,13 @@ export async function getEstimationGasPrice(customGasPriceGwei?: number, rate: n
     const multipliedGasPriceNumber = currentGasPriceNumber * rate;
     const multipliedGasPrice = BigInt(Math.floor(multipliedGasPriceNumber));
     
-    // Minimum 150 gwei
-    const minGasPrice = ethers.parseUnits("150", "gwei");
+    // Apply minimum gas price
+    const minGasPrice = ethers.parseUnits(minGasPriceGwei.toString(), "gwei");
     
     return multipliedGasPrice > minGasPrice ? multipliedGasPrice : minGasPrice;
   } catch (error) {
-    console.warn("⚠️ Could not fetch network gas prices, using minimum 150 gwei");
-    return ethers.parseUnits("150", "gwei");
+    console.warn(`⚠️ Could not fetch network gas prices, using minimum ${minGasPriceGwei} gwei`);
+    return ethers.parseUnits(minGasPriceGwei.toString(), "gwei");
   }
 }
 
@@ -469,12 +469,13 @@ export async function estimateFile(
   sourcePath: string,
   destinationPath: string,
   gasPriceGwei?: number,
-  rate: number = 2.0
+  rate: number = 2.0,
+  minGasPriceGwei: number = 150
 ): Promise<FileEstimateResult> {
   console.log(`📊 Estimating gas for: ${sourcePath} → ${destinationPath}`);
   
   // Get gas price for estimation
-  const gasPrice = await getEstimationGasPrice(gasPriceGwei, rate);
+  const gasPrice = await getEstimationGasPrice(gasPriceGwei, rate, minGasPriceGwei);
   console.log(`⛽ Using gas price: ${ethers.formatUnits(gasPrice, "gwei")} gwei`);
   
   // Parameter validation
@@ -652,13 +653,26 @@ export async function estimateFile(
   
   const totalCost = totalGas * gasPrice;
   const transactionCount = chunksToUpload.length;
+  const averageGas = transactionCount > 0 ? totalGas / BigInt(transactionCount) : 0n;
+  
+  // Calculate cost per MB
+  const fileSizeMB = fileData.length / (1024 * 1024);
+  const costPerMBWei = fileSizeMB > 0 ? (totalCost * BigInt(1e18)) / BigInt(Math.floor(fileSizeMB * 1e18)) : 0n;
+  
+  // Get network info for currency symbol
+  const network = await ethers.provider.getNetwork();
+  const isPolygon = network.chainId === 137n;
+  const currencySymbol = isPolygon ? "POL" : "ETH";
   
   console.log(`\n📊 Estimation Summary:`);
   console.log(`   Total gas: ${totalGas.toString()}`);
-  console.log(`   Total cost: ${ethers.formatEther(totalCost)} ETH`);
-  console.log(`   Royalty cost: ${ethers.formatEther(totalRoyalty)} ETH`);
+  console.log(`   Average gas per transaction: ${averageGas.toString()}`);
+  console.log(`   Total cost: ${ethers.formatEther(totalCost)} ${currencySymbol}`);
+  console.log(`   Royalty cost: ${ethers.formatEther(totalRoyalty)} ${currencySymbol}`);
+  console.log(`   Cost per MB: ${fileSizeMB > 0 ? ethers.formatEther(costPerMBWei) : "0"} ${currencySymbol}/MB`);
   console.log(`   Transactions: ${transactionCount} PUT (conservative overestimation)`);
   console.log(`   Gas price: ${ethers.formatUnits(gasPrice, "gwei")} gwei`);
+  console.log(`   Settings: ${gasPriceGwei ? `gasprice=${gasPriceGwei}` : `rate=${rate}, min=${minGasPriceGwei}`}`);
   
   return {
     totalGas,
