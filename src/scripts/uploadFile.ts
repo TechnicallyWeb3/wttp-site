@@ -142,6 +142,43 @@ export async function getDynamicGasSettings() {
   }
 }
 
+// Helper function to get gas price for estimation (custom or multiply current by rate, min 150 gwei)
+export async function getEstimationGasPrice(customGasPriceGwei?: number, rate: number = 2.0): Promise<bigint> {
+  if (customGasPriceGwei !== undefined) {
+    return ethers.parseUnits(customGasPriceGwei.toString(), "gwei");
+  }
+  
+  try {
+    const feeData = await ethers.provider.getFeeData();
+    let currentGasPrice: bigint;
+    
+    if (feeData.maxFeePerGas) {
+      // EIP-1559 network
+      currentGasPrice = feeData.maxFeePerGas;
+    } else if (feeData.gasPrice) {
+      // Legacy network
+      currentGasPrice = feeData.gasPrice;
+    } else {
+      // Fallback
+      currentGasPrice = ethers.parseUnits("75", "gwei"); // Default to 75 gwei
+    }
+    
+    // Multiply the current gas price by the rate
+    // Convert to number, multiply, then back to bigint to handle decimals
+    const currentGasPriceNumber = Number(currentGasPrice);
+    const multipliedGasPriceNumber = currentGasPriceNumber * rate;
+    const multipliedGasPrice = BigInt(Math.floor(multipliedGasPriceNumber));
+    
+    // Minimum 150 gwei
+    const minGasPrice = ethers.parseUnits("150", "gwei");
+    
+    return multipliedGasPrice > minGasPrice ? multipliedGasPrice : minGasPrice;
+  } catch (error) {
+    console.warn("⚠️ Could not fetch network gas prices, using minimum 150 gwei");
+    return ethers.parseUnits("150", "gwei");
+  }
+}
+
 // Main upload function with enhanced error handling and validation
 export async function uploadFile(
   wttpSite: IBaseWTTPSite,
@@ -414,6 +451,224 @@ export async function uploadFile(
     
   }
   return fetchResult;
+}
+
+// Gas estimation function for file uploads
+export interface FileEstimateResult {
+  totalGas: bigint;
+  totalCost: bigint;
+  royaltyCost: bigint;
+  transactionCount: number;
+  chunksToUpload: number;
+  needsPUT: boolean;
+  gasPrice: bigint;
+}
+
+export async function estimateFile(
+  wttpSite: IBaseWTTPSite,
+  sourcePath: string,
+  destinationPath: string,
+  gasPriceGwei?: number,
+  rate: number = 2.0
+): Promise<FileEstimateResult> {
+  console.log(`📊 Estimating gas for: ${sourcePath} → ${destinationPath}`);
+  
+  // Get gas price for estimation
+  const gasPrice = await getEstimationGasPrice(gasPriceGwei, rate);
+  console.log(`⛽ Using gas price: ${ethers.formatUnits(gasPrice, "gwei")} gwei`);
+  
+  // Parameter validation
+  if (!wttpSite) {
+    throw new Error("Web3Site contract instance is required");
+  }
+  
+  if (!sourcePath || !destinationPath) {
+    throw new Error("Both source and destination paths are required");
+  }
+  if (!fs.existsSync(sourcePath)) {
+    throw new Error(`Source file does not exist: ${sourcePath}`);
+  }
+  if (!fs.statSync(sourcePath).isFile()) {
+    throw new Error(`Source path is not a file: ${sourcePath}`);
+  }
+  
+  // Normalize the destination path
+  try {
+    destinationPath = normalizePath(destinationPath);
+  } catch (error) {
+    throw new Error(`Invalid destination path format: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+  
+  // Read file
+  let fileData: Buffer;
+  try {
+    fileData = fs.readFileSync(sourcePath);
+  } catch (error) {
+    throw new Error(`Failed to read file ${sourcePath}: ${error}`);
+  }
+  
+  console.log(`📁 File size: ${fileData.length} bytes`);
+  
+  // Validate file size
+  if (fileData.length === 0) {
+    throw new Error("Cannot estimate empty file");
+  }
+  
+  // Chunk the data
+  const chunks = chunkData(fileData, CHUNK_SIZE);
+  console.log(`Split into ${chunks.length} chunks of ${CHUNK_SIZE} bytes`);
+  
+  // Prepare data registrations
+  const signer = await ethers.provider.getSigner();
+  const signerAddress = await signer.getAddress();
+  
+  const dataRegistrations = chunks.map((chunk, index) => ({
+    data: chunk,
+    chunkIndex: index,
+    publisher: signerAddress
+  }));
+  
+  // Get the DPS and DPR contracts
+  const dpsAddress = await wttpSite.DPS();
+  const dps = await ethers.getContractAt("@tw3/esp/contracts/interfaces/IDataPointStorage.sol:IDataPointStorage", dpsAddress);
+  const dprAddress = await wttpSite.DPR();
+  const dpr = await ethers.getContractAt("@tw3/esp/contracts/interfaces/IDataPointRegistry.sol:IDataPointRegistry", dprAddress);
+  
+  let totalRoyalty = 0n;
+  let dataPointAddresses = new Array(dataRegistrations.length).fill("");
+  let chunksToUpload: number[] = [];
+  
+  // Check existing resource
+  let resourceResponse;
+  let resourceDataPointAddresses: string[] = [];
+  try {
+    resourceResponse = await fetchResource(await wttpSite.getAddress(), destinationPath);
+    resourceDataPointAddresses = resourceResponse.response.resource.dataPoints.map(dp => dp.toString());
+  } catch (error) {
+    // Resource doesn't exist yet
+    resourceResponse = null;
+  }
+  
+  // Calculate royalties and determine which chunks need uploading
+  console.log(`📊 Calculating royalties for ${dataRegistrations.length} chunks...`);
+  for (let i = 0; i < dataRegistrations.length; i++) {
+    const chunk = dataRegistrations[i];
+    
+    // Calculate the data point address
+    const dataPointAddress = await dps.calculateAddress(chunk.data);
+    dataPointAddresses[i] = dataPointAddress;
+    
+    if (resourceDataPointAddresses.length > i) {
+      // Check if this chunk already exists in the resource
+      const existingAddress = resourceDataPointAddresses[i] || "";
+      if (existingAddress === dataPointAddress) {
+        console.log(`✅ Chunk ${i + 1}/${dataRegistrations.length} already exists, skipping`);
+      } else {
+        chunksToUpload.push(i);
+        const royalty = await dpr.getDataPointRoyalty(dataPointAddress);
+        totalRoyalty += royalty;
+      }
+    } else {
+      chunksToUpload.push(i);
+      const royalty = await dpr.getDataPointRoyalty(dataPointAddress);
+      totalRoyalty += royalty;
+    }
+  }
+  
+  console.log(`💰 Total royalty required: ${ethers.formatEther(totalRoyalty)} ETH`);
+  console.log(`📋 Chunks to upload: ${chunksToUpload.length}/${dataRegistrations.length}`);
+  
+  // Get MIME type and charset
+  const { mimeType, charset } = getMimeTypeWithCharset(sourcePath);
+  const mimeTypeBytes2 = encodeMimeType(mimeType);
+  const charsetBytes2 = charset ? encodeCharset(charset) : encodeCharset("");
+  
+  const headRequest = {
+    path: destinationPath,
+    ifModifiedSince: 0,
+    ifNoneMatch: ethers.ZeroHash
+  };
+  
+  const putRequest = {
+    head: headRequest,
+    properties: {
+      mimeType: mimeTypeBytes2,
+      charset: charsetBytes2,
+      encoding: "0x6964", // id = identity
+      language: "0x6575" // eu = english-US
+    },
+    data: [dataRegistrations[0]]
+  };
+  
+  // Use PUT for all chunks (overestimates but works without existing resources)
+  console.log(`📝 Using PUT for all chunks (conservative overestimation)`);
+  
+  let totalGas = 0n;
+  
+  // Estimate PUT for all chunks
+  // For PUT, all chunks need chunkIndex: 0 since PUT creates/replaces the resource starting from 0
+  for (let i = 0; i < chunksToUpload.length; i++) {
+    const chunkIndex = chunksToUpload[i];
+    const chunkRoyalty = await dpr.getDataPointRoyalty(dataPointAddresses[chunkIndex]);
+    
+    // PUT always expects chunkIndex: 0 in the DataRegistration
+    // Create a PUT request with this chunk's data but chunkIndex set to 0
+    const putRequestForChunk = {
+      head: headRequest,
+      properties: {
+        mimeType: mimeTypeBytes2,
+        charset: charsetBytes2,
+        encoding: "0x6964", // id = identity
+        language: "0x6575" // eu = english-US
+      },
+      data: [{
+        data: dataRegistrations[chunkIndex].data,
+        chunkIndex: 0, // PUT always uses chunkIndex 0
+        publisher: dataRegistrations[chunkIndex].publisher
+      }]
+    };
+    
+    try {
+      const putGasEstimate = await wttpSite.PUT.estimateGas(putRequestForChunk, {
+        value: chunkRoyalty
+      });
+      totalGas += putGasEstimate;
+      if ((i + 1) % 10 === 0 || i === chunksToUpload.length - 1) {
+        console.log(`⛽ Estimated ${i + 1}/${chunksToUpload.length} PUT transactions...`);
+      }
+    } catch (error) {
+      console.warn(`⚠️ Could not estimate PUT gas for chunk ${chunkIndex}: ${error}`);
+      // Use a conservative estimate based on chunk 0 if available, otherwise default
+      if (i === 0) {
+        // If chunk 0 fails, use a default conservative estimate
+        totalGas += 200000n;
+      } else {
+        // For subsequent chunks, use the same estimate as chunk 0 if available
+        // This is a conservative overestimate
+        totalGas += 200000n; // Conservative estimate per chunk
+      }
+    }
+  }
+  
+  const totalCost = totalGas * gasPrice;
+  const transactionCount = chunksToUpload.length;
+  
+  console.log(`\n📊 Estimation Summary:`);
+  console.log(`   Total gas: ${totalGas.toString()}`);
+  console.log(`   Total cost: ${ethers.formatEther(totalCost)} ETH`);
+  console.log(`   Royalty cost: ${ethers.formatEther(totalRoyalty)} ETH`);
+  console.log(`   Transactions: ${transactionCount} PUT (conservative overestimation)`);
+  console.log(`   Gas price: ${ethers.formatUnits(gasPrice, "gwei")} gwei`);
+  
+  return {
+    totalGas,
+    totalCost,
+    royaltyCost: totalRoyalty,
+    transactionCount,
+    chunksToUpload: chunksToUpload.length,
+    needsPUT: true, // Always true since we're using PUT for all
+    gasPrice
+  };
 }
 
 // Command-line interface

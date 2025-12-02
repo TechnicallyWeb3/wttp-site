@@ -8,7 +8,7 @@ import {
   HEADRequestStruct, 
   normalizePath 
 } from "@wttp/core";
-import { getMimeType, uploadFile, getDynamicGasSettings, looseEqual } from "./uploadFile";
+import { getMimeType, uploadFile, getDynamicGasSettings, looseEqual, estimateFile, FileEstimateResult, getEstimationGasPrice } from "./uploadFile";
 import { fetchResource } from "./fetchResource";
 import { createWTTPIgnore, WTTPIgnoreOptions } from "./wttpIgnore";
 
@@ -306,6 +306,154 @@ export async function uploadDirectory(
     
   console.log(`Directory ${sourcePath} uploaded successfully to ${destinationPath}`);
   return true;
+}
+
+// Gas estimation function for directory uploads
+export interface DirectoryEstimateResult {
+  totalGas: bigint;
+  totalCost: bigint;
+  totalRoyaltyCost: bigint;
+  totalTransactions: number;
+  fileCount: number;
+  directoryCount: number;
+  fileEstimates: Map<string, FileEstimateResult>;
+  gasPrice: bigint;
+}
+
+export async function estimateDirectory(
+  wttpSite: IBaseWTTPSite,
+  sourcePath: string,
+  destinationPath: string,
+  gasPriceGwei?: number,
+  ignoreOptions?: WTTPIgnoreOptions,
+  rate: number = 2.0
+): Promise<DirectoryEstimateResult> {
+  console.log(`📊 Estimating gas for directory: ${sourcePath} → ${destinationPath}`);
+  
+  // Parameter validation
+  if (!fs.existsSync(sourcePath)) {
+    throw new Error(`Source directory does not exist: ${sourcePath}`);
+  }
+  if (!isDirectory(sourcePath)) {
+    throw new Error(`Source path ${sourcePath} is not a directory`);
+  }
+  
+  destinationPath = normalizePath(destinationPath, true);
+  
+  // Initialize WTTP ignore system
+  const wttpIgnore = createWTTPIgnore(sourcePath, ignoreOptions);
+  console.log(`📋 Using ${wttpIgnore.getPatterns().length} ignore patterns`);
+  
+  // Get gas price once for consistency
+  const gasPrice = await getEstimationGasPrice(gasPriceGwei, rate);
+  console.log(`⛽ Using gas price: ${ethers.formatUnits(gasPrice, "gwei")} gwei`);
+  
+  let totalGas = 0n;
+  let totalRoyaltyCost = 0n;
+  let totalTransactions = 0;
+  let fileCount = 0;
+  let directoryCount = 0;
+  const fileEstimates = new Map<string, FileEstimateResult>();
+  
+  // Estimate DEFINE transaction for directory
+  // Find the index files for the directory to determine redirect
+  const indexFiles = findIndexFiles(sourcePath);
+  let indexLocation = `./${indexFiles[0]}`; // Defaults to index.html even if it doesn't exist
+  let redirectCode = 301;
+  
+  if (indexFiles.length > 1) {
+    redirectCode = 300; // Multiple choices
+  }
+  
+  // Create header data for DEFINE
+  const newHeaderData = {
+    ...DEFAULT_HEADER,
+    redirect: {
+      code: redirectCode,
+      location: indexLocation
+    }
+  };
+  
+  // Construct DEFINE request
+  let requestHead: HEADRequestStruct = {
+    path: destinationPath,
+    ifModifiedSince: 0,
+    ifNoneMatch: ethers.ZeroHash
+  };
+  
+  const defineRequest: DEFINERequestStruct = {
+    head: requestHead,
+    data: newHeaderData
+  };
+  
+  try {
+    console.log(`⛽ Estimating DEFINE transaction...`);
+    const defineGasEstimate = await wttpSite.DEFINE.estimateGas(defineRequest);
+    totalGas += defineGasEstimate;
+    totalTransactions += 1;
+    console.log(`   DEFINE gas: ${defineGasEstimate.toString()}`);
+  } catch (error) {
+    console.warn(`⚠️ Could not estimate DEFINE gas, using conservative estimate: ${error}`);
+    // Use a conservative estimate if actual estimation fails
+    const defineGasEstimate = 50000n;
+    totalGas += defineGasEstimate;
+    totalTransactions += 1;
+    console.log(`   Using conservative DEFINE gas estimate: ${defineGasEstimate.toString()}`);
+  }
+  
+  // Get all files recursively
+  const allFiles = getAllFiles(sourcePath, wttpIgnore);
+  
+  console.log(`📁 Found ${allFiles.length} files to estimate`);
+  
+  // Estimate each file
+  for (const filePath of allFiles) {
+    const relativePath = path.relative(sourcePath, filePath);
+    const fullDestPath = path.join(destinationPath, relativePath).replace(/\\/g, '/');
+    
+    try {
+      console.log(`\n📊 Estimating: ${relativePath}`);
+      const fileEstimate = await estimateFile(wttpSite, filePath, fullDestPath, gasPriceGwei, rate);
+      
+      totalGas += fileEstimate.totalGas;
+      totalRoyaltyCost += fileEstimate.royaltyCost;
+      totalTransactions += fileEstimate.transactionCount;
+      fileCount++;
+      fileEstimates.set(relativePath, fileEstimate);
+      
+      console.log(`   ✅ Estimated: ${fileEstimate.transactionCount} transactions, ${ethers.formatEther(fileEstimate.totalCost)} ETH`);
+    } catch (error) {
+      console.error(`❌ Failed to estimate file ${relativePath}:`, error);
+      // Continue with other files
+    }
+  }
+  
+  // Count directories
+  const allDirs = getAllDirectories(sourcePath, sourcePath, wttpIgnore);
+  directoryCount = allDirs.length;
+  
+  // Calculate total cost
+  const totalCost = totalGas * gasPrice;
+  
+  console.log(`\n📊 Directory Estimation Summary:`);
+  console.log(`   Total gas: ${totalGas.toString()}`);
+  console.log(`   Total cost: ${ethers.formatEther(totalCost)} ETH`);
+  console.log(`   Total royalty cost: ${ethers.formatEther(totalRoyaltyCost)} ETH`);
+  console.log(`   Total transactions: ${totalTransactions}`);
+  console.log(`   Files: ${fileCount}`);
+  console.log(`   Directories: ${directoryCount}`);
+  console.log(`   Gas price: ${ethers.formatUnits(gasPrice, "gwei")} gwei`);
+  
+  return {
+    totalGas,
+    totalCost,
+    totalRoyaltyCost,
+    totalTransactions,
+    fileCount,
+    directoryCount,
+    fileEstimates,
+    gasPrice
+  };
 }
 
 // Command-line interface
