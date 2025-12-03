@@ -1,0 +1,101 @@
+{
+  "name": "test-upload-demo",
+  "path": "./test-upload-demo/",
+  "wttpConfig": {
+    "externalStorageRules": [
+      {
+        "minSizeBytes": 1048576,
+        "provider": "arweave",
+        "redirectCode": 301,
+        "mimeTypes": [
+          "*"
+        ]
+      },
+      {
+        "provider": "arweave",
+        "redirectCode": 301,
+        "mimeTypes": [
+          "image/*",
+          "video/*"
+        ]
+      }
+    ]
+  },
+  "siteData": {
+    "directories": [
+      {
+        "path": "/",
+        "index": "./index.html"
+      },
+      {
+        "path": "/node_modules/",
+        "index": "./index.html"
+      },
+      {
+        "path": "/public/",
+        "index": "./index.html"
+      },
+      {
+        "path": "/src/",
+        "index": "./index.html"
+      }
+    ],
+    "files": [
+      {
+        "path": "./important.md",
+        "type": "text/markdown",
+        "size": 202,
+        "status": "pending",
+        "chunks": [
+          {
+            "address": "0x57fe6beea5b3f3c0049b3a5ee072b8326198a6982a85ce03b55b46fb626d853f"
+          }
+        ]
+      },
+      {
+        "path": "./index.html",
+        "type": "text/html",
+        "size": 508,
+        "status": "pending",
+        "chunks": [
+          {
+            "address": "0xc1bdf875143c2e10579f93fef09dfdf47d1a9d08a50e01460688c5f487525baa"
+          }
+        ]
+      },
+      {
+        "path": "./node_modules/fake-package.js",
+        "type": "text/javascript",
+        "size": 78,
+        "status": "pending",
+        "chunks": [
+          {
+            "address": "0xdf519af5c9f2a507de881c4698fcdaa6b157935007406fb36b7cf7f1e202a826"
+          }
+        ]
+      },
+      {
+        "path": "./public/style.css",
+        "type": "text/css",
+        "size": 248,
+        "status": "pending",
+        "chunks": [
+          {
+            "address": "0xa68212a46c37ce23381d21d082216ae3ba73a8c9bddd125944ccf6e7b843040d"
+          }
+        ]
+      },
+      {
+        "path": "./src/app.js",
+        "type": "text/javascript",
+        "size": 543,
+        "status": "pending",
+        "chunks": [
+          {
+            "address": "0x1094bf95bd503a8bc0c82c08f83d60c7ee441960ad90bc7e6be737dd14c0d8bc"
+          }
+        ]
+      }
+    ]
+  }
+}

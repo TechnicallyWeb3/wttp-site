@@ -1,0 +1,13 @@
+{
+  "test": {
+    "network": "sepolia",
+    "siteAddress": "0x8de4FAA55d6521Ff79a45bCB05359c177c7CD46E",
+    "description": "Test configuration for manifest generation with estimates"
+  },
+  "production": {
+    "network": "polygon",
+    "siteAddress": "0x1234567890123456789012345678901234567890",
+    "description": "Production site configuration"
+  }
+}
+

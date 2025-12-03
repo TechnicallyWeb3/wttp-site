@@ -1,0 +1,22 @@
+[
+  {
+    "minSizeBytes": 10485760,
+    "provider": "arweave",
+    "redirectCode": 301,
+    "mimeTypes": ["image/*", "video/*", "audio/*"],
+    "extensions": [".png", ".jpg", ".jpeg", ".gif", ".mp4", ".mov", ".mp3", ".wav"]
+  },
+  {
+    "minSizeBytes": 52428800,
+    "provider": "arweave",
+    "redirectCode": 301,
+    "mimeTypes": ["*"]
+  },
+  {
+    "extensions": [".pdf"],
+    "minSizeBytes": 5242880,
+    "provider": "ipfs",
+    "redirectCode": 302
+  }
+]
+

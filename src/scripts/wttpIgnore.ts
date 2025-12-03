@@ -20,7 +20,8 @@ const DEFAULT_IGNORE_PATTERNS = [
   "*~",
   ".vscode/",
   ".idea/",
-  ".wttpignore"
+  ".wttpignore",
+  "wttp.manifest.json"
 ];
 
 export interface WTTPIgnoreOptions {

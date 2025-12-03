@@ -1,0 +1,21 @@
+{
+  "networks": {
+    "localhost": {
+      "network": "localhost",
+      "siteAddress": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+      "dpsVersion": 2
+    },
+    "sepolia": {
+      "network": "sepolia",
+      "siteAddress": "0x8de4FAA55d6521Ff79a45bCB05359c177c7CD46E",
+      "dpsVersion": 2
+    },
+    "polygon": {
+      "network": "polygon",
+      "siteAddress": "0x1234567890123456789012345678901234567890",
+      "dpsVersion": 2
+    }
+  },
+  "default": "sepolia"
+}
+

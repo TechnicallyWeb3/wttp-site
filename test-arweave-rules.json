@@ -1,0 +1,14 @@
+[
+  {
+    "minSizeBytes": 1048576,
+    "provider": "arweave",
+    "redirectCode": 301,
+    "mimeTypes": ["*"]
+  },
+  {
+    "provider": "arweave",
+    "redirectCode": 301,
+    "mimeTypes": ["image/*", "video/*"]
+  }
+]
+
