@@ -2,7 +2,7 @@ import { task, types } from "hardhat/config";
 import fs from "fs";
 import crypto from "crypto";
 
-// Hardcoded empty contract fallback for estimation
+// Hardcoded contract fallback for estimation to test change to a contract you have permission to write to
 const DEFAULT_ESTIMATION_SITE = "0x8de4FAA55d6521Ff79a45bCB05359c177c7CD46E";
 
 // Helper function to check if a path is a directory
