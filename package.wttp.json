@@ -1,5 +1,5 @@
 {
-  "name": "wttp-site",
+  "name": "@wttp/site",
   "version": "0.5.0",
   "description": "Web3 Transfer Protocol (WTTP) - Site Contracts and deployment tools",
   "main": "./dist/cjs/src/index.js",
