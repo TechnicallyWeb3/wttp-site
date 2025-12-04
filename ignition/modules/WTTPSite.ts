@@ -1,6 +1,5 @@
 // This module deploys a WTTP site using Hardhat Ignition
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
-import { ethers } from "hardhat";
 import { getContractAddress } from "@tw3/esp";
 
 // Default header configuration for WTTP sites - updated to new structure

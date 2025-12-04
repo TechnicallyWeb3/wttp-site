@@ -475,9 +475,18 @@ async function deployOrLoadTestEsp(hre: HardhatRuntimeEnvironment, deploymentArg
           dpsFactory = await hre.ethers.getContractFactory(dpsAbi, dpsBytecode, signer);
         }
         const dps = await dpsFactory.deploy();
+        
+        // Wait for DPS deployment transaction to be fully confirmed
+        const dpsDeployTx = dps.deploymentTransaction();
+        if (dpsDeployTx) {
+          await dpsDeployTx.wait(1); // Wait for 1 confirmation
+        }
         await dps.waitForDeployment();
         deploymentArgs.dps = await dps.getAddress();
         console.log(`📍 Using test DPS(temporary deployment): ${deploymentArgs.dps}`);
+        
+        // Additional wait to ensure nonce is updated in provider (critical for Hardhat automining)
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
       if (!deploymentArgs?.royaltyRate) {
         deploymentArgs.royaltyRate = 1000;
@@ -497,7 +506,16 @@ async function deployOrLoadTestEsp(hre: HardhatRuntimeEnvironment, deploymentArg
       }
 
       const dpr = await dprFactory.deploy(deploymentArgs.owner, deploymentArgs.dps, deploymentArgs.royaltyRate);
+      
+      // Wait for DPR deployment transaction to be fully confirmed
+      const dprDeployTx = dpr.deploymentTransaction();
+      if (dprDeployTx) {
+        await dprDeployTx.wait(1); // Wait for 1 confirmation
+      }
       await dpr.waitForDeployment();
+      
+      // Additional wait to ensure nonce is updated in provider
+      await new Promise(resolve => setTimeout(resolve, 300));
       const dprAddress = await dpr.getAddress();
       console.log(dprAddress);
       console.log(`📍 Using test DPR(temporary deployment): ${dprAddress}`);

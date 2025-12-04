@@ -43,6 +43,7 @@ abstract contract BaseWTTPStorage {
         address _dpr
     ) {
         DPR_ = IDataPointRegistry(_dpr);
+        // DPR_.DPS().VERSION(); // this will revert if the DPS is not deployed
     }
 
     /// @notice Reference to the Data Point Registry contract

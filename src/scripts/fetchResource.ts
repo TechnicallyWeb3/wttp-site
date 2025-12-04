@@ -56,8 +56,8 @@ export async function fetchResource(
     chainId 
   } = options;
 
-  console.log(`🌐 Connecting to site: ${siteAddress}`);
-  console.log(`📄 Requesting resource: ${path}${headRequest ? ' (HEAD only)' : ''}`);
+  if (process.env.WTTP_SITE_DEBUG) console.log(`🌐 Connecting to site: ${siteAddress}`);
+  if (process.env.WTTP_SITE_DEBUG) console.log(`📄 Requesting resource: ${path}${headRequest ? ' (HEAD only)' : ''}`);
 
   // Get the site contract with error handling
   let siteContract: IBaseWTTPSite;
@@ -103,24 +103,24 @@ export async function fetchResource(
 
   // If it's a HEAD request, just call HEAD
   if (headRequest) {
-    console.log(`Sending HEAD request for ${path} from site ${siteAddress}`);
+    if (process.env.WTTP_SITE_DEBUG) console.log(`Sending HEAD request for ${path} from site ${siteAddress}`);
     try {
       head = await siteContract.HEAD(headRequest_obj) as HEADResponseStruct;
     } catch (error: any) {
-      console.log("HEAD request failed, assuming file doesn't exist");
+      if (process.env.WTTP_SITE_DEBUG) console.log("HEAD request failed, assuming file doesn't exist");
     }
 
     return { response: { head, resource: { dataPoints: [], totalChunks: 0 } }, content: undefined };
 
   } else {
     // For GET requests, use the site's GET method which returns LOCATEResponse
-    console.log(`Fetching resource at ${path} from site ${siteAddress}`);
+    if (process.env.WTTP_SITE_DEBUG) console.log(`Fetching resource at ${path} from site ${siteAddress}`);
     
     let locateResponse: LOCATEResponseStruct;
     try {
       locateResponse = await siteContract.GET({head: headRequest_obj, rangeChunks: range}) as LOCATEResponseStruct;
     } catch (error: any) {
-      console.log(error);
+      if (process.env.WTTP_SITE_DEBUG) console.log(`Error fetching resource at ${path} from site ${siteAddress}: ${error}`);
       locateResponse = {
         head: head,
         resource: {
@@ -131,8 +131,8 @@ export async function fetchResource(
     }
     
     // Updated to use new response structure without responseLine wrapper
-    console.log(`Response status: ${locateResponse.head.status}`);
-    console.log(`Found ${locateResponse.resource.dataPoints.length} data points`);
+    if (process.env.WTTP_SITE_DEBUG) console.log(`Response status: ${locateResponse.head.status}`);
+    if (process.env.WTTP_SITE_DEBUG) console.log(`Found ${locateResponse.resource.dataPoints.length} data points`);
 
     // If the response is successful and user wants data (no --datapoints flag), load the content
     let content: Uint8Array | undefined = undefined;
@@ -164,7 +164,7 @@ export async function readDataPointsContent(
   dataPoints: string[],
   chainId?: number
 ): Promise<Uint8Array> {
-  console.log(`📥 Reading content from ${dataPoints.length} datapoints...`);
+  if (process.env.WTTP_SITE_DEBUG) console.log(`📥 Reading content from ${dataPoints.length} datapoints...`);
   
   // Parameter validation
   if (!siteAddress || !dataPoints || dataPoints.length === 0) {
@@ -175,7 +175,7 @@ export async function readDataPointsContent(
   const siteContract = await ethers.getContractAt("Web3Site", siteAddress) as unknown as IBaseWTTPSite;
   const dpsAddress = await siteContract.DPS();
 
-  console.log(`🔗 Loading DPS at address ${dpsAddress}...`);
+  if (process.env.WTTP_SITE_DEBUG) console.log(`🔗 Loading DPS at address ${dpsAddress}...`);
   
   // Get the DPS contract
   const dpsContract = await ethers.getContractAt("@tw3/esp/contracts/interfaces/IDataPointStorage.sol:IDataPointStorage", dpsAddress);
@@ -187,7 +187,7 @@ export async function readDataPointsContent(
   for (let i = 0; i < dataPoints.length; i++) {
     const dataPointAddress = dataPoints[i];
     const progress = Math.round(((i + 1) / dataPoints.length) * 100);
-    console.log(`📊 Reading chunk ${i + 1}/${dataPoints.length} (${progress}%): ${dataPointAddress.substring(0, 10)}...`);
+    if (process.env.WTTP_SITE_DEBUG) console.log(`📊 Reading chunk ${i + 1}/${dataPoints.length} (${progress}%): ${dataPointAddress.substring(0, 10)}...`);
     
     try {
       // Read the datapoint content
@@ -196,7 +196,7 @@ export async function readDataPointsContent(
       contents.push(chunk);
       totalBytesRead += chunk.length;
       
-      console.log(`✅ Chunk ${i + 1} read: ${chunk.length} bytes`);
+      if (process.env.WTTP_SITE_DEBUG) console.log(`✅ Chunk ${i + 1} read: ${chunk.length} bytes`);
     } catch (error) {
       console.error(`❌ Failed to read datapoint ${dataPointAddress}:`, error);
       throw new Error(`Failed to read datapoint ${i + 1}/${dataPoints.length}: ${error}`);
@@ -204,7 +204,7 @@ export async function readDataPointsContent(
   }
   
   // Combine all content chunks with optimized allocation
-  console.log(`🔗 Combining ${dataPoints.length} chunks (${totalBytesRead} total bytes)...`);
+  if (process.env.WTTP_SITE_DEBUG) console.log(`🔗 Combining ${dataPoints.length} chunks (${totalBytesRead} total bytes)...`);
   const combined = new Uint8Array(totalBytesRead);
   
   let offset = 0;
@@ -214,7 +214,7 @@ export async function readDataPointsContent(
     offset += chunk.length;
   }
   
-  console.log(`✅ Successfully reconstructed ${combined.length} bytes from ${dataPoints.length} chunks`);
+  if (process.env.WTTP_SITE_DEBUG) console.log(`✅ Successfully reconstructed ${combined.length} bytes from ${dataPoints.length} chunks`);
   return combined;
 }
 
