@@ -7,3 +7,4 @@ export * from "./estimate";
 export * from "./deploy";
 export * from "./generateManifest";
 export * from "./fetchResource";
+export * from "./uploadToArweave";

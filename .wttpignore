@@ -39,6 +39,7 @@ node_modules/
 # Environment and secret files
 .env
 !.env.template
+*wallet.json
 
 # Version control
 

@@ -1,10 +1,13 @@
-node_modules
-.env
+# Secrets files
+.env*
+!.env.template
+*wallet.json
 
-/dist
-/contracts/test/
-/contracts/interfaces
-/docs
+node_modules
+dist
+contracts/test/
+contracts/interfaces
+docs
 
 # Hardhat files
 /cache

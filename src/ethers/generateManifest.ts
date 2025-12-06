@@ -46,6 +46,7 @@ export interface ManifestConfig {
   ignorePattern?: string[] | string | "none";
   externalStorageRules?: ExternalStorageRule[];
   testConfig?: TestConfig;
+  destination?: string; // Destination path on WTTP site
 }
 
 export interface ChunkData {
@@ -79,12 +80,20 @@ export interface FileData {
 export interface DirectoryData {
   path: string;
   index: string;
+  status?: string; // pending, complete, error
+  txHash?: string; // Transaction hash for DEFINE
 }
 
 export interface TransactionData {
   txHash?: string;
   method: string;
+  path?: string; // File or directory path
   chunkAddress?: string;
+  range?: string; // Byte range for chunks
+  redirect?: {
+    code: number;
+    location: string;
+  };
   value?: number;
   gasUsed?: number;
   data?: any;
@@ -355,11 +364,17 @@ export async function generateManifestStandalone(
     };
   }
 
+  // Prepare config to save in manifest
+  const manifestConfig: ManifestConfig | undefined = config ? {
+    ...config,
+    destination: destinationPath
+  } : undefined;
+
   // Initialize manifest structure
   const manifest: Manifest = {
     name: path.basename(sourcePath),
     path: `./${path.basename(sourcePath)}/`,
-    wttpConfig: config,
+    wttpConfig: manifestConfig,
     siteData: {
       directories: [],
       files: []

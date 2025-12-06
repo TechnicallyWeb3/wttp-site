@@ -27,7 +27,7 @@ const DEFAULT_FILE_LIMIT = 400 * 1024 * 1024; // 400MB limit
 const DEFAULT_GAS_LIMIT = 300; // Default gas limit in gwei
 
 // Re-export for backward compatibility
-export { looseEqual, getMimeType, getMimeTypeWithCharset };
+export { looseEqual, getMimeType, getMimeTypeWithCharset, chunkData };
 
 // Wrapper functions that use Hardhat's ethers.provider
 export async function getChainSymbol(): Promise<string> {

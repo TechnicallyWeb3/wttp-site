@@ -156,12 +156,68 @@ task("site:manifest", "Generate a manifest file for a WTTP site directory")
 
     console.log("\n✅ Manifest generation complete!");
     
-    if (manifest.chainData?.contractAddress) {
+    // Detect external storage providers from rules
+    const externalProviders = new Set<string>();
+    if (config.externalStorageRules && Array.isArray(config.externalStorageRules)) {
+      for (const rule of config.externalStorageRules) {
+        if (rule.provider && typeof rule.provider === "string") {
+          externalProviders.add(rule.provider.toLowerCase());
+        }
+      }
+    }
+    
+    // Also check the generated manifest for files with external storage
+    if (manifest.siteData?.files) {
+      for (const file of manifest.siteData.files) {
+        if (file.externalStorage) {
+          externalProviders.add(file.externalStorage.toLowerCase());
+        }
+      }
+    }
+    
+    const hasArweave = externalProviders.has("arweave");
+    const hasIPFS = externalProviders.has("ipfs");
+    
+    // Provide next steps based on what was detected
+    if (hasArweave || hasIPFS) {
+      console.log(`\n📦 External storage detected: ${Array.from(externalProviders).join(", ")}`);
+      console.log(`\n💡 Next steps:`);
+      
+      let stepNumber = 1;
+      
+      if (hasArweave) {
+        const emoji = stepNumber === 1 ? "1️⃣" : stepNumber === 2 ? "2️⃣" : "3️⃣";
+        console.log(`\n   ${emoji}  Upload files to Arweave first:`);
+        console.log(`      npx hardhat arweave:upload --manifest ${outputPath} --wallet <path-to-arweave-wallet.json>`);
+        stepNumber++;
+      }
+      
+      if (hasIPFS) {
+        const emoji = stepNumber === 1 ? "1️⃣" : stepNumber === 2 ? "2️⃣" : "3️⃣";
+        console.log(`\n   ${emoji}  Upload files to IPFS first:`);
+        console.log(`      npx hardhat ipfs:upload --manifest ${outputPath}`);
+        stepNumber++;
+      }
+      
+      const emoji = stepNumber === 1 ? "1️⃣" : stepNumber === 2 ? "2️⃣" : "3️⃣";
+      if (manifest.chainData?.contractAddress) {
+        console.log(`\n   ${emoji}  Then upload redirects to your WTTP site:`);
+        console.log(`      npx hardhat site:upload --site ${manifest.chainData.contractAddress} --manifest ${outputPath} --network ${hre.network.name}`);
+      } else {
+        console.log(`\n   ${emoji}  Then upload redirects to your WTTP site:`);
+        console.log(`      npx hardhat site:upload --site <site-address> --manifest ${outputPath} --network ${hre.network.name}`);
+      }
+    } else if (manifest.chainData?.contractAddress) {
+      console.log(`\n💡 Next step:`);
       console.log(`   Run this command to start uploading:`);
-      console.log(`   npx hardhat site:upload --site ${manifest.chainData.contractAddress} --source ${source} --network ${hre.network.name}`);
+      console.log(`   npx hardhat site:upload --site ${manifest.chainData.contractAddress} --manifest ${outputPath} --network ${hre.network.name}`);
     } else {
+      console.log(`\n💡 Next steps:`);
       console.log(`   Manifest created without site address.`);
       console.log(`   To add estimates, regenerate with --site or --testconfig`);
+      if (hasArweave || hasIPFS) {
+        console.log(`   Or upload to external storage first, then upload redirects.`);
+      }
     }
   });
 
