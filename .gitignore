@@ -2,6 +2,7 @@
 .env*
 !.env.template
 *wallet.json
+*.jwt
 
 node_modules
 dist

@@ -4,7 +4,9 @@ import fs from "fs";
 import path from "path";
 import { 
   encodeCharset,
-  encodeMimeType, 
+  encodeMimeType,
+  encodeEncoding,
+  encodeLanguage,
   type LOCATEResponseStruct, 
   normalizePath
 } from "@wttp/core";
@@ -194,7 +196,7 @@ export async function uploadFile(
   const { mimeType, charset } = getMimeTypeWithCharset(sourcePath);
   console.log(`Mime type: ${mimeType}, charset: ${charset || 'none'}`);
   const mimeTypeBytes2 = encodeMimeType(mimeType);
-  const charsetBytes2 = charset ? encodeCharset(charset) : encodeCharset("");
+  const charsetBytes2 = encodeCharset(charset || "");
 
   // Wait for gas price to be below limit if specified
   if (gasLimitGwei !== undefined) {
@@ -218,8 +220,8 @@ export async function uploadFile(
     properties: {
       mimeType: mimeTypeBytes2,
       charset: charsetBytes2,
-      encoding: "0x6964", // id = identity
-      language: "0x6575" // eu = english-US
+      encoding: encodeEncoding("identity"),
+      language: encodeLanguage("en-US")
     },
     data: [dataRegistrations[0]]
   };

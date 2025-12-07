@@ -4,7 +4,9 @@ import fs from "fs";
 import path from "path";
 import { 
   encodeCharset,
-  encodeMimeType, 
+  encodeMimeType,
+  encodeEncoding,
+  encodeLanguage,
   normalizePath
 } from "@wttp/core";
 // Import artifact directly to avoid loading tasks
@@ -178,7 +180,7 @@ export async function estimateFile(
   // Get MIME type and charset
   const { mimeType, charset } = getMimeTypeWithCharset(sourcePath);
   const mimeTypeBytes2 = encodeMimeType(mimeType);
-  const charsetBytes2 = charset ? encodeCharset(charset) : encodeCharset("");
+  const charsetBytes2 = encodeCharset(charset || "");
   
   const headRequest = {
     path: destinationPath,
@@ -191,8 +193,8 @@ export async function estimateFile(
     properties: {
       mimeType: mimeTypeBytes2,
       charset: charsetBytes2,
-      encoding: "0x6964", // id = identity
-      language: "0x6575" // eu = english-US
+      encoding: encodeEncoding("identity"),
+      language: encodeLanguage("en-US")
     },
     data: [dataRegistrations[0]]
   };
@@ -213,8 +215,8 @@ export async function estimateFile(
       properties: {
         mimeType: mimeTypeBytes2,
         charset: charsetBytes2,
-        encoding: "0x6964",
-        language: "0x6575"
+        encoding: encodeEncoding("identity"),
+        language: encodeLanguage("en-US")
       },
       data: [{
         data: dataRegistrations[chunkIndex].data,

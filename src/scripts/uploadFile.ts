@@ -2,7 +2,9 @@ import { ethers } from "hardhat";
 import fs from "fs";
 import { 
   encodeCharset,
-  encodeMimeType, 
+  encodeMimeType,
+  encodeEncoding,
+  encodeLanguage,
   IBaseWTTPSite, 
   LOCATEResponseStruct, 
   normalizePath
@@ -229,8 +231,8 @@ export async function uploadFile(
     properties: {
       mimeType: mimeTypeBytes2,
       charset: charsetBytes2,
-      encoding: "0x6964", // id = identity
-      language: "0x6575" // eu = english-US
+      encoding: encodeEncoding("identity"),
+      language: encodeLanguage("en-US")
     },
     data: [dataRegistrations[0]]
   };
@@ -244,17 +246,32 @@ export async function uploadFile(
   let needsPUT = false;
   let patchChunks = [...chunksToUpload]; // Copy of chunks to upload
 
-  // Check if properties are different (requires PUT)
+  // Check if properties are different (requires PUT) - check this FIRST
   if (!looseEqual(resourceResponse.response.head.metadata.properties, putRequest.properties)) {
     console.log("❌ File properties are different, requires PUT");
     // console.log("Response properties:", resourceResponse.response.head.metadata.properties);
     // console.log("Put request properties:", putRequest.properties);
     needsPUT = true;
+    
+    // When we do PUT, the resource is recreated. ALL chunks need to be re-attached.
+    // So patchChunks should include all chunks from 1 to n-1, not just those with data changes.
+    patchChunks = Array.from({ length: dataRegistrations.length - 1 }, (_, i) => i + 1);
+    
+    // Calculate royalties for any chunks not already in chunksToUpload
+    for (let i = 1; i < dataRegistrations.length; i++) {
+      if (!chunksToUpload.includes(i)) {
+        // This chunk wasn't going to be uploaded (data unchanged), but now needs to be
+        console.log(`📊 Calculating royalty for chunk ${i + 1} (needed for resource rebuild)...`);
+        royalty[i] = await dpr.getDataPointRoyalty(dataPointAddresses[i]);
+        totalRoyalty += royalty[i];
+        console.log(`💰 Additional royalty for chunk ${i + 1}: ${ethers.formatEther(royalty[i])} ${currencySymbol}`);
+      }
+    }
   } else {
     console.log("✅ File properties are identical, using PATCH only");
   }
 
-  // If we need PUT and chunk 0 is in the upload list, PUT handles chunk 0
+  // If we need PUT, handle chunk 0
   if (needsPUT) {
     // If chunk 0 data is unchanged but we need PUT, we still need to pay royalty for chunk 0
     if (!chunksToUpload.includes(0)) {
@@ -262,12 +279,12 @@ export async function uploadFile(
       royalty[0] = await dpr.getDataPointRoyalty(dataPointAddresses[0]);
       totalRoyalty += royalty[0];
       console.log(`💰 Additional royalty for PUT: ${ethers.formatEther(royalty[0])} ${currencySymbol}`);
-      
-      // Re-check balance with updated royalty
-      const balance = await ethers.provider.getBalance(signerAddress);
-      if (balance < totalRoyalty) {
-        throw new Error(`Insufficient balance after adding PUT royalty. Required: ${ethers.formatEther(totalRoyalty)} ${currencySymbol}, Available: ${ethers.formatEther(balance)} ${currencySymbol}`);
-      }
+    }
+    
+    // Re-check balance with updated royalty
+    const balance = await ethers.provider.getBalance(signerAddress);
+    if (balance < totalRoyalty) {
+      throw new Error(`Insufficient balance after adding royalties for rebuild. Required: ${ethers.formatEther(totalRoyalty)} ${currencySymbol}, Available: ${ethers.formatEther(balance)} ${currencySymbol}`);
     }
     
     // Wait for gas price to be below limit if specified (before PUT)
@@ -286,9 +303,6 @@ export async function uploadFile(
       totalRoyaltiesSpent += royalty[0];
     }
     console.log("✅ PUT transaction completed - file properties and first chunk updated");
-    
-    // Remove chunk 0 from PATCH list if it was there
-    patchChunks = patchChunks.filter(i => i !== 0);
   }
 
   // Upload remaining chunks with progress reporting
@@ -520,8 +534,8 @@ export async function estimateFile(
     properties: {
       mimeType: mimeTypeBytes2,
       charset: charsetBytes2,
-      encoding: "0x6964", // id = identity
-      language: "0x6575" // eu = english-US
+      encoding: encodeEncoding("identity"),
+      language: encodeLanguage("en-US")
     },
     data: [dataRegistrations[0]]
   };
@@ -544,8 +558,8 @@ export async function estimateFile(
       properties: {
         mimeType: mimeTypeBytes2,
         charset: charsetBytes2,
-        encoding: "0x6964", // id = identity
-        language: "0x6575" // eu = english-US
+        encoding: encodeEncoding("identity"),
+        language: encodeLanguage("en-US")
       },
       data: [{
         data: dataRegistrations[chunkIndex].data,

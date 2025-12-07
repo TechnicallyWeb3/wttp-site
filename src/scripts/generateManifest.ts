@@ -4,7 +4,9 @@ import path from "path";
 import crypto from "crypto";
 import { 
   encodeCharset,
-  encodeMimeType, 
+  encodeMimeType,
+  encodeEncoding,
+  encodeLanguage,
   IBaseWTTPSite,
   normalizePath
 } from "@wttp/core";
@@ -470,9 +472,9 @@ export async function generateManifest(
             },
             properties: {
               mimeType: encodeMimeType(mimeType),
-              charset: charset ? encodeCharset(charset) : encodeCharset(""),
-              encoding: "0x6964", // identity
-              language: "0x6575" // en-US
+              charset: encodeCharset(charset || ""),
+              encoding: encodeEncoding("identity"),
+              language: encodeLanguage("en-US")
             },
             data: [{
               data: chunk,

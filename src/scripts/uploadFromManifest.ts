@@ -4,13 +4,14 @@ import path from "path";
 import { 
   IBaseWTTPSite, 
   DEFAULT_HEADER, 
-  DEFINERequestStruct, 
-  HEADRequestStruct,
+  DEFINERequestStruct,
   PUTRequestStruct,
   PATCHRequestStruct,
   DataRegistrationStruct,
   encodeCharset,
   encodeMimeType,
+  encodeEncoding,
+  encodeLanguage,
   normalizePath
 } from "@wttp/core";
 import { 
@@ -18,9 +19,6 @@ import {
   saveManifest,
   Manifest,
   FileData,
-  DirectoryData,
-  ChunkData,
-  TransactionData
 } from "./generateManifest";
 import {
   chunkData,
@@ -99,9 +97,13 @@ export async function uploadFromManifest(
       const gasSettings = await getDynamicGasSettings();
       
       // Create DEFINE request for directory
+      // Normalize the directory index path (remove ./ prefix and join with destination)
+      const indexRelativePath = directory.index.replace(/^\.\//, "");
+      const normalizedIndexPath = normalizePath(path.join(destinationPath, indexRelativePath).replace(/\\/g, '/'));
+      
       const defineRequest: DEFINERequestStruct = {
         head: {
-          path: directory.path,
+          path: normalizePath(path.join(destinationPath, directory.path).replace(/\\/g, '/')),
           ifModifiedSince: 0,
           ifNoneMatch: ethers.ZeroHash
         },
@@ -109,7 +111,7 @@ export async function uploadFromManifest(
           ...DEFAULT_HEADER,
           redirect: {
             code: 301,
-            location: directory.index
+            location: normalizedIndexPath
           }
         }
       };
@@ -138,10 +140,10 @@ export async function uploadFromManifest(
         manifest.chainData.transactions.push({
           txHash: receipt.hash,
           method: "DEFINE",
-          path: directory.path,
+          path: normalizePath(path.join(destinationPath, directory.path).replace(/\\/g, '/')),
           redirect: {
             code: 301,
-            location: directory.index
+            location: normalizedIndexPath
           },
           gasUsed: Number(receipt.gasUsed)
         });
@@ -179,6 +181,7 @@ export async function uploadFromManifest(
         file,
         manifest,
         manifestPath,
+        destinationPath,
         gasLimitGwei,
         siteAddress,
         currencySymbol
@@ -192,6 +195,7 @@ export async function uploadFromManifest(
     // Handle regular files
     const fileRelativePath = file.path.replace(/^\.\//, "");
     const fileAbsolutePath = path.join(baseSourcePath, fileRelativePath);
+    const normalizedFilePath = normalizePath(path.join(destinationPath, fileRelativePath).replace(/\\/g, '/'));
     
     if (!fs.existsSync(fileAbsolutePath)) {
       console.warn(`⚠️  File not found: ${fileAbsolutePath} - skipping`);
@@ -271,15 +275,15 @@ export async function uploadFromManifest(
     // Build PUT request (first chunk)
     const putRequest: PUTRequestStruct = {
       head: {
-        path: normalizePath(path.join(destinationPath, fileRelativePath)),
+        path: normalizedFilePath,
         ifModifiedSince: 0,
         ifNoneMatch: ethers.ZeroHash
       },
       properties: {
         mimeType: encodeMimeType(file.type),
-        charset: file.charset ? encodeCharset(file.charset) : encodeCharset("utf-8"),
-        encoding: encodeCharset("identity"),
-        language: encodeCharset("en-US")
+        charset: encodeCharset(file.charset || ""),
+        encoding: encodeEncoding("identity"),
+        language: encodeLanguage("en-US")
       },
       data: [dataRegistrations[0]]
     };
@@ -313,7 +317,7 @@ export async function uploadFromManifest(
           manifest.chainData.transactions.push({
             txHash: receipt.hash,
             method: "PUT",
-            path: file.path,
+            path: normalizedFilePath,
             chunkAddress: file.chunks[0].address,
             range: file.chunks[0].range,
             value: Number(ethers.formatEther(royalties[0])),
@@ -348,7 +352,7 @@ export async function uploadFromManifest(
             manifest.chainData.transactions.push({
               txHash: receipt.hash,
               method: "PUT",
-              path: file.path,
+              path: normalizedFilePath,
               chunkAddress: file.chunks[0].address,
               range: file.chunks[0].range,
               value: Number(ethers.formatEther(freshRoyalty)),
@@ -372,7 +376,7 @@ export async function uploadFromManifest(
         
         const patchRequest: PATCHRequestStruct = {
           head: {
-            path: normalizePath(path.join(destinationPath, fileRelativePath)),
+            path: normalizedFilePath,
             ifModifiedSince: 0,
             ifNoneMatch: ethers.ZeroHash
           },
@@ -397,7 +401,7 @@ export async function uploadFromManifest(
               manifest.chainData.transactions.push({
                 txHash: receipt.hash,
                 method: "PATCH",
-                path: file.path,
+                path: normalizedFilePath,
                 chunkAddress: file.chunks[i].address,
                 range: file.chunks[i].range,
                 value: Number(ethers.formatEther(royalties[i])),
@@ -432,7 +436,7 @@ export async function uploadFromManifest(
                 manifest.chainData.transactions.push({
                   txHash: receipt.hash,
                   method: "PATCH",
-                  path: file.path,
+                  path: normalizedFilePath,
                   chunkAddress: file.chunks[i].address,
                   range: file.chunks[i].range,
                   value: Number(ethers.formatEther(freshRoyalty)),
@@ -485,6 +489,7 @@ async function uploadArweaveRedirect(
   file: FileData,
   manifest: Manifest,
   manifestPath: string,
+  destinationPath: string,
   gasLimitGwei: number | undefined,
   siteAddress: string,
   currencySymbol: string
@@ -500,7 +505,11 @@ async function uploadArweaveRedirect(
     return;
   }
   
-  console.log(`📍 Setting redirect for ${file.path} → ${file.redirect.location}`);
+  // Normalize the file path (remove ./ prefix and join with destination, then normalize)
+  const fileRelativePath = file.path.replace(/^\.\//, "");
+  const normalizedPath = normalizePath(path.join(destinationPath, fileRelativePath).replace(/\\/g, '/'));
+  
+  console.log(`📍 Setting redirect for ${normalizedPath} → ${file.redirect.location}`);
   
   try {
     // Wait for gas limit
@@ -513,7 +522,7 @@ async function uploadArweaveRedirect(
     // Create DEFINE request with redirect
     const defineRequest: DEFINERequestStruct = {
       head: {
-        path: file.path,
+        path: normalizedPath,
         ifModifiedSince: 0,
         ifNoneMatch: ethers.ZeroHash
       },
@@ -549,7 +558,7 @@ async function uploadArweaveRedirect(
         manifest.chainData.transactions.push({
           txHash: receipt.hash,
           method: "DEFINE",
-          path: file.path,
+          path: normalizedPath,
           redirect: {
             code: file.redirect.code,
             location: file.redirect.location
@@ -558,13 +567,13 @@ async function uploadArweaveRedirect(
         });
       }
       
-      console.log(`✅ Redirect set: ${file.path} → ${file.redirect.location}`);
+      console.log(`✅ Redirect set: ${normalizedPath} → ${file.redirect.location}`);
       
       // Save manifest
       saveManifest(manifest, manifestPath);
     }
   } catch (error) {
-    console.error(`❌ Failed to set redirect for ${file.path}:`, error);
+    console.error(`❌ Failed to set redirect for ${normalizedPath}:`, error);
     file.status = "error";
     saveManifest(manifest, manifestPath);
     throw error;
