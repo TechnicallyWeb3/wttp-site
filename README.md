@@ -277,6 +277,78 @@ For in-depth guides, tutorials, and advanced use cases, please visit our full do
 - **[Tutorials](./docs/tutorials/)**: Follow step-by-step instructions for common tasks like uploading sites and managing permissions.
 - **[Examples](./docs/examples/)**: Explore complete, working examples for static sites, blogs, file storage, and more.
 
+## 🔧 Scripts and Tasks
+
+WTTP Site provides comprehensive tooling through Hardhat tasks, Hardhat scripts, and standalone ethers.js scripts. These tools enable you to deploy sites, upload content, manage manifests, interact with Arweave, and optimize WordPress sites.
+
+### Quick Reference
+
+**Hardhat Tasks (CLI Commands):**
+- `site:deploy` - Deploy a Web3Site contract
+- `site:upload` - Upload files or directories to your site
+- `site:fetch` - Fetch resources from your site
+- `site:manifest` - Generate manifest files for cost estimation
+- `site:estimate` - Estimate gas costs before uploading
+- `site:verify` - Verify deployed contracts on block explorers
+- `arweave:upload` - Upload files to Arweave storage
+- `arweave:generate` - Generate Arweave wallets
+- `wp-minimize` - Optimize WordPress sites by removing unused files
+- `wp-ninja-fix` - Replace Ninja Forms with static HTML
+- `wp-routes` - Process WordPress route redirects
+
+**Standalone Ethers Scripts:**
+- `deployWeb3Site()` - Deploy contracts programmatically
+- `uploadFile()` - Upload files using ethers.js
+- `uploadDirectory()` - Upload directories using ethers.js
+- `estimateFile()` / `estimateDirectory()` - Estimate costs
+- `fetchResource()` - Fetch resources programmatically
+- `generateManifestStandalone()` - Generate manifests
+- `uploadToArweave()` - Upload to Arweave programmatically
+
+**Usage Examples:**
+
+```bash
+# Deploy a site
+npx hardhat site:deploy --network sepolia
+
+# Upload your website
+npx hardhat site:upload --site 0x... --source ./public --network sepolia
+
+# Generate manifest with cost estimates
+npx hardhat site:manifest --source ./public --site 0x... --network sepolia
+
+# Estimate upload costs
+npx hardhat site:estimate --source ./public --network sepolia
+```
+
+**Using in Your Code:**
+
+```typescript
+import { deployWeb3Site, uploadFile } from "@wttp/site/ethers";
+import { ethers } from "ethers";
+
+const provider = new ethers.JsonRpcProvider("https://sepolia.infura.io/v3/YOUR_KEY");
+const signer = new ethers.Wallet(process.env.PRIVATE_KEY!, provider);
+
+// Deploy
+const deployment = await deployWeb3Site({
+  provider,
+  signer,
+  ownerAddress: signer.address,
+  dprAddress: "0x...",
+});
+
+// Upload
+await uploadFile(
+  deployment.address,
+  "./index.html",
+  "/index.html",
+  { provider, signer }
+);
+```
+
+For complete documentation with all parameters, examples, and advanced usage, see **[Scripts and Tasks Documentation](./docs/SCRIPTS_AND_TASKS.md)**.
+
 ## 🛡️ File Filtering with `.wttpignore`
 
 WTTP automatically protects you from accidentally uploading sensitive files to the blockchain. When uploading directories, the system uses gitignore-style patterns to filter out files that shouldn't be deployed on-chain.
