@@ -133,7 +133,8 @@ export async function uploadDirectory(
   destinationPath: string,
   ignoreOptions?: WTTPIgnoreOptions,
   fileLimitBytes?: number,
-  gasLimitGwei?: number
+  gasLimitGwei?: number,
+  customPublisher?: string
 ) {
   console.log(`🚀 Starting directory upload: ${sourcePath} → ${destinationPath}`);
   
@@ -184,7 +185,7 @@ export async function uploadDirectory(
       fs.writeFileSync(tempMetadataPath, directoryMetadataJson);
       // the directory listing is too large, so we need to upload it as a file
       // can be done async in background
-      await uploadFile(wttpSite, tempMetadataPath, destinationPath, fileLimitBytes, gasLimitGwei);
+      await uploadFile(wttpSite, tempMetadataPath, destinationPath, fileLimitBytes, gasLimitGwei, customPublisher);
     }
   }
   
@@ -316,7 +317,7 @@ export async function uploadDirectory(
       } else {
         // Upload files
         console.log(`📤 Uploading file: ${item}`);
-        await uploadFile(wttpSite, fullSourcePath, fullDestPath, fileLimitBytes, gasLimitGwei);
+        await uploadFile(wttpSite, fullSourcePath, fullDestPath, fileLimitBytes, gasLimitGwei, customPublisher);
         console.log(`✅ File uploaded successfully: ${item}`);
       }
     } catch (error) {

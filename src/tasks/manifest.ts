@@ -14,6 +14,7 @@ task("site:manifest", "Generate a manifest file for a WTTP site directory")
   .addOptionalParam("ignorepattern", "Custom ignore pattern file path or 'none'", undefined, types.string)
   .addOptionalParam("externalrules", "JSON file path containing external storage rules", undefined, types.string)
   .addOptionalParam("update", "Path to existing manifest to update", undefined, types.string)
+  .addOptionalParam("publisher", "Optional publisher address for chainData level", undefined, types.string)
   .setAction(async (taskArgs, hre) => {
     const { 
       source, 
@@ -26,7 +27,8 @@ task("site:manifest", "Generate a manifest file for a WTTP site directory")
       nodefaults, 
       ignorepattern,
       externalrules,
-      update
+      update,
+      publisher
     } = taskArgs;
 
     // Import the manifest generation functions
@@ -142,7 +144,8 @@ task("site:manifest", "Generate a manifest file for a WTTP site directory")
       source,
       destPath,
       Object.keys(config).length > 0 ? config : undefined,
-      existingManifest
+      existingManifest,
+      publisher
     );
 
     // Determine output path

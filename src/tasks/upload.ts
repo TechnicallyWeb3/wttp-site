@@ -14,8 +14,9 @@ task("site:upload", "Upload a file or directory to a WTTP site")
   .addOptionalParam("nodefaults", "Disable default ignore patterns", false, types.boolean)
   .addOptionalParam("gaslimit", "Maximum gas price in gwei to wait for before sending transactions (default: 300)", 300, types.float)
   .addOptionalParam("filelimit", "Maximum file size in MB (default: 400)", 400, types.float)
+  .addOptionalParam("publisher", "Optional custom publisher address (overrides signer address)", undefined, types.string)
   .setAction(async (taskArgs, hre) => {
-    const { site, source, manifest, destination, nodefaults, gaslimit, filelimit } = taskArgs;
+    const { site, source, manifest, destination, nodefaults, gaslimit, filelimit, publisher } = taskArgs;
     
     // Check if using manifest-based upload
     if (manifest) {
@@ -181,13 +182,13 @@ task("site:upload", "Upload a file or directory to a WTTP site")
         };
         
         // Upload the directory
-        await uploadDirectory(wtppSite, source, destination, ignoreOptions, fileLimitBytes, gasLimitGwei);
+        await uploadDirectory(wtppSite, source, destination, ignoreOptions, fileLimitBytes, gasLimitGwei, publisher);
       } else {
         console.log(`Source ${source} is a file, using file upload...`);
         // Import the file upload function
         const { uploadFile } = require("../scripts/uploadFile");
         // Upload the file
-        await uploadFile(wtppSite, source, destination, fileLimitBytes, gasLimitGwei);
+        await uploadFile(wtppSite, source, destination, fileLimitBytes, gasLimitGwei, publisher);
       }
     }
   });

@@ -53,7 +53,8 @@ export async function uploadFile(
   sourcePath: string,
   destinationPath: string,
   fileLimitBytes?: number,
-  gasLimitGwei?: number
+  gasLimitGwei?: number,
+  customPublisher?: string
 ) {
   console.log(`🚀 Starting upload: ${sourcePath} → ${destinationPath}`);
   
@@ -127,11 +128,14 @@ export async function uploadFile(
   const signer = await ethers.provider.getSigner();
   const signerAddress = await signer.getAddress();
   
+  // Use custom publisher if provided, otherwise use signer address
+  const publisherAddress = customPublisher || signerAddress;
+  
   // Prepare data registrations
   const dataRegistrations = chunks.map((chunk, index) => ({
     data: chunk,
     chunkIndex: index,
-    publisher: signerAddress
+    publisher: publisherAddress
   }));
 
   // FIXED: Initialize royalty array with correct size to prevent index errors
@@ -409,7 +413,8 @@ export async function estimateFile(
   destinationPath: string,
   gasPriceGwei?: number,
   rate: number = 2,
-  minGasPriceGwei: number = 150
+  minGasPriceGwei: number = 150,
+  customPublisher?: string
 ): Promise<FileEstimateResult> {
   console.log(`📊 Estimating gas for: ${sourcePath} → ${destinationPath}`);
   
@@ -462,10 +467,13 @@ export async function estimateFile(
   const signer = await ethers.provider.getSigner();
   const signerAddress = await signer.getAddress();
   
+  // Use custom publisher if provided, otherwise use signer address
+  const publisherAddress = customPublisher || signerAddress;
+  
   const dataRegistrations = chunks.map((chunk, index) => ({
     data: chunk,
     chunkIndex: index,
-    publisher: signerAddress
+    publisher: publisherAddress
   }));
   
   // Get the DPS and DPR contracts

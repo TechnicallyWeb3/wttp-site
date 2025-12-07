@@ -39,6 +39,7 @@ export interface EstimateOptions {
   gasPriceGwei?: number;
   rate?: number;
   minGasPriceGwei?: number;
+  customPublisher?: string;
 }
 
 export interface FileEstimateResult {
@@ -57,7 +58,7 @@ export async function estimateFile(
   destinationPath: string,
   options: EstimateOptions
 ): Promise<FileEstimateResult> {
-  const { provider, gasPriceGwei, rate = 2, minGasPriceGwei = 150 } = options;
+  const { provider, gasPriceGwei, rate = 2, minGasPriceGwei = 150, customPublisher } = options;
   
   console.log(`📊 Estimating gas for: ${sourcePath} → ${destinationPath}`);
   
@@ -110,12 +111,13 @@ export async function estimateFile(
   console.log(`Split into ${chunks.length} chunks of ${CHUNK_SIZE} bytes`);
   
   // Prepare data registrations
-  const signerAddress = wttpSiteAddress; // Use site address as publisher for estimation
+  // Use custom publisher if provided, otherwise use site address for estimation
+  const publisherAddress = customPublisher || wttpSiteAddress;
   
   const dataRegistrations = chunks.map((chunk, index) => ({
     data: chunk,
     chunkIndex: index,
-    publisher: signerAddress
+    publisher: publisherAddress
   }));
   
   // Get the DPR contract first, then get DPS from it

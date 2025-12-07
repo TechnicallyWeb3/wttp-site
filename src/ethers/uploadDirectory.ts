@@ -123,6 +123,7 @@ export interface UploadDirectoryOptions {
   ignoreOptions?: WTTPIgnoreOptions;
   fileLimitBytes?: number;
   gasLimitGwei?: number;
+  customPublisher?: string;
 }
 
 // Main upload directory function
@@ -133,7 +134,7 @@ export async function uploadDirectory(
   destinationPath: string,
   options: UploadDirectoryOptions
 ) {
-  const { provider, signer, ignoreOptions, fileLimitBytes, gasLimitGwei } = options;
+  const { provider, signer, ignoreOptions, fileLimitBytes, gasLimitGwei, customPublisher } = options;
   const wttpSite = getWttpSite(wttpSiteAddress, provider, signer);
   console.log(`🚀 Starting directory upload: ${sourcePath} → ${destinationPath}`);
   
@@ -187,7 +188,8 @@ export async function uploadDirectory(
         provider,
         signer,
         fileLimitBytes,
-        gasLimitGwei
+        gasLimitGwei,
+        customPublisher
       });
     }
   }
@@ -274,7 +276,8 @@ export async function uploadDirectory(
           provider,
           signer,
           fileLimitBytes,
-          gasLimitGwei
+          gasLimitGwei,
+          customPublisher
         });
       }
     } catch (error) {

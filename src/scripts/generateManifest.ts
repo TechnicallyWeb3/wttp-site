@@ -49,6 +49,7 @@ export interface ManifestConfig {
   externalStorageRules?: ExternalStorageRule[];
   testConfig?: TestConfig;
   destination?: string; // Destination path on WTTP site
+  publisher?: string; // Optional publisher address for all files/chunks in this manifest
 }
 
 export interface ChunkData {
@@ -59,6 +60,7 @@ export interface ChunkData {
   gas?: number;
   txHash?: string;
   prerequisite?: string;
+  publisher?: string;
 }
 
 export interface FileData {
@@ -77,6 +79,7 @@ export interface FileData {
     location: string;
   };
   chunks: ChunkData[];
+  publisher?: string;
 }
 
 export interface DirectoryData {
@@ -115,6 +118,7 @@ export interface Manifest {
     name: string;
     symbol: string;
     transactions: TransactionData[];
+    publisher?: string;
   };
 }
 
@@ -247,7 +251,8 @@ export async function generateManifest(
   sourcePath: string,
   destinationPath: string,
   config?: ManifestConfig,
-  existingManifest?: Manifest
+  existingManifest?: Manifest,
+  publisher?: string
 ): Promise<Manifest> {
   const estimationMode = wttpSite !== null;
   
@@ -328,7 +333,8 @@ export async function generateManifest(
       chainId: Number(network.chainId),
       name: network.name === "unknown" ? `chain-${network.chainId}` : network.name,
       symbol: currencySymbol,
-      transactions: existingManifest?.chainData?.transactions || []
+      publisher: publisher || config?.publisher || existingManifest?.chainData?.publisher,
+      transactions: existingManifest?.chainData?.transactions || [],
     };
   }
 

@@ -229,10 +229,13 @@ export async function uploadFromManifest(
         continue;
       }
       
+      // Publisher lookup: chunk.publisher -> file.publisher -> chainData.publisher -> signerAddress
+      const publisherAddress = chunkInfo.publisher || file.publisher || manifest.chainData?.publisher || signerAddress;
+      
       dataRegistrations.push({
         data: chunks[i],
         chunkIndex: i,
-        publisher: signerAddress
+        publisher: publisherAddress
       });
       
       // Use royalty from manifest if available

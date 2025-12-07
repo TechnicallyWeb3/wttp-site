@@ -49,6 +49,7 @@ export interface ManifestConfig {
   externalStorageRules?: ExternalStorageRule[];
   testConfig?: TestConfig;
   destination?: string; // Destination path on WTTP site
+  publisher?: string; // Optional publisher address for all files/chunks in this manifest
 }
 
 export interface ChunkData {
@@ -59,6 +60,7 @@ export interface ChunkData {
   gas?: number;
   txHash?: string;
   prerequisite?: string;
+  publisher?: string;
 }
 
 export interface FileData {
@@ -77,6 +79,7 @@ export interface FileData {
     location: string;
   };
   chunks: ChunkData[];
+  publisher?: string;
 }
 
 export interface DirectoryData {
@@ -114,6 +117,7 @@ export interface Manifest {
     chainId: number;
     name: string;
     symbol: string;
+    publisher?: string;
     transactions: TransactionData[];
   };
 }
@@ -246,6 +250,7 @@ export async function generateManifestStandalone(
     chainId?: number;
     chainName?: string;
     currencySymbol?: string;
+    publisher?: string; // Optional publisher address
   }
 ): Promise<Manifest> {
   const hasProvider = options?.provider !== undefined;
@@ -353,6 +358,7 @@ export async function generateManifestStandalone(
       chainId: Number(network.chainId),
       name: options.chainName || (network.name === "unknown" ? `chain-${network.chainId}` : network.name),
       symbol: currencySymbol,
+      publisher: options.publisher || config?.publisher || existingManifest?.chainData?.publisher,
       transactions: existingManifest?.chainData?.transactions || []
     };
   } else if (options?.chainId && options?.chainName && options?.currencySymbol) {
@@ -362,6 +368,7 @@ export async function generateManifestStandalone(
       chainId: options.chainId,
       name: options.chainName,
       symbol: options.currencySymbol,
+      publisher: options.publisher || config?.publisher || existingManifest?.chainData?.publisher,
       transactions: existingManifest?.chainData?.transactions || []
     };
   }

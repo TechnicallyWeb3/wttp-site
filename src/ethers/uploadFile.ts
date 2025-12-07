@@ -42,6 +42,7 @@ export interface UploadFileOptions {
   signer: Signer;
   fileLimitBytes?: number;
   gasLimitGwei?: number;
+  customPublisher?: string;
 }
 
 // Main upload function with enhanced error handling and validation
@@ -54,7 +55,7 @@ export async function uploadFile(
   response: LOCATEResponseStruct,
   content?: Uint8Array,
 }> {
-  const { provider, signer, fileLimitBytes, gasLimitGwei } = options;
+  const { provider, signer, fileLimitBytes, gasLimitGwei, customPublisher } = options;
   
   console.log(`🚀 Starting upload: ${sourcePath} → ${destinationPath}`);
   
@@ -117,11 +118,14 @@ export async function uploadFile(
   // Prepare for upload
   const signerAddress = await signer.getAddress();
   
+  // Use custom publisher if provided, otherwise use signer address
+  const publisherAddress = customPublisher || signerAddress;
+  
   // Prepare data registrations
   const dataRegistrations = chunks.map((chunk, index) => ({
     data: chunk,
     chunkIndex: index,
-    publisher: signerAddress
+    publisher: publisherAddress
   }));
 
   // Initialize royalty array
