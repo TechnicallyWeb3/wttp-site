@@ -1,6 +1,6 @@
 {
   "name": "@wttp/site",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Web3 Transfer Protocol (WTTP) - Site Contracts and deployment tools",
   "main": "./dist/cjs/src/index.js",
   "module": "./dist/esm/src/index.js",
@@ -98,7 +98,10 @@
     "shx": "^0.3.4"
   },
   "dependencies": {
+    "@dha-team/arbundles": "^1.0.0",
     "@wttp/core": "^1.0.1",
-    "hardhat": "^2.24.2"
+    "arweave": "^1.15.1",
+    "hardhat": "^2.24.2",
+    "vhsm": "^0.2.2"
   }
 }

@@ -1,6 +1,5 @@
 import { ethers } from "hardhat";
 import fs from "fs";
-import path from "path";
 import { 
   encodeCharset,
   encodeMimeType, 
@@ -24,7 +23,7 @@ import {
 const CHUNK_SIZE = 32 * 1024; // 32KB chunks
 const DEFAULT_FILE_WARN = 100 * 1024 * 1024; // 100MB warning
 const DEFAULT_FILE_LIMIT = 400 * 1024 * 1024; // 400MB limit
-const DEFAULT_GAS_LIMIT = 300; // Default gas limit in gwei
+// const DEFAULT_GAS_LIMIT = 300; // Default gas limit in gwei
 
 // Re-export for backward compatibility
 export { looseEqual, getMimeType, getMimeTypeWithCharset, chunkData };
@@ -620,10 +619,10 @@ async function main() {
   const [siteAddress, sourcePath, destinationPath] = args;
   
   // Connect to the WTTP site
-  const wtppSite = await ethers.getContractAt("Web3Site", siteAddress);
+  const wttpSite = await ethers.getContractAt("Web3Site", siteAddress);
   
   // Upload the file
-  await uploadFile(wtppSite, sourcePath, destinationPath);
+  await uploadFile(wttpSite, sourcePath, destinationPath);
 }
 
 // Only execute the script if it's being run directly

@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import Arweave from "arweave";
 import type { JWKInterface } from "arweave/node/lib/wallet";
-import { Manifest, saveManifest, loadManifest } from "./generateManifest";
+import { saveManifest, loadManifest } from "./generateManifest";
 
 export interface ArweaveUploadOptions {
   /** Path to Arweave wallet JSON file (JWK format) */
@@ -225,53 +225,3 @@ export async function uploadToArweave(
     manifestTxId,
   };
 }
-
-/**
- * Standalone function to upload files to Arweave (can be used outside Hardhat)
- * 
- * @param manifestPathOrConfig Either a path to manifest file, or a ManifestConfig object
- * @param sourcePath Source directory path (required if generating manifest)
- * @param options Upload options
- * @returns Upload result
- */
-export async function uploadToArweaveStandalone(
-  manifestPathOrConfig: string | any,
-  sourcePath?: string,
-  options: ArweaveUploadOptions = {}
-): Promise<ArweaveUploadResult> {
-  const { generateManifestStandalone, saveManifest } = await import("./generateManifest");
-  
-  let manifest: Manifest;
-  let manifestPath: string;
-
-  if (typeof manifestPathOrConfig === "string") {
-    // Load existing manifest
-    manifestPath = manifestPathOrConfig;
-    manifest = loadManifest(manifestPath);
-    
-    // Use source path from options or manifest directory
-    if (!options.sourcePath) {
-      options.sourcePath = path.dirname(manifestPath);
-    }
-  } else {
-    // Generate manifest from config
-    if (!sourcePath) {
-      throw new Error("sourcePath is required when providing ManifestConfig");
-    }
-    
-    const config = manifestPathOrConfig;
-    const outputPath = path.join(sourcePath, "wttp.manifest.json");
-    
-    manifest = await generateManifestStandalone(
-      sourcePath,
-      "/",
-      config
-    );
-    
-    manifestPath = saveManifest(manifest, outputPath);
-    options.sourcePath = sourcePath;
-  }
-
-  return uploadToArweave(manifestPath, options);
-}
-

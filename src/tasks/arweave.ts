@@ -2,8 +2,7 @@ import { task, types } from "hardhat/config";
 import fs from "fs";
 import path from "path";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { uploadToArweave, uploadToArweaveStandalone } from "../ethers/uploadToArweave";
-import { generateManifestStandalone, ManifestConfig, loadManifest } from "../ethers/generateManifest";
+import { ManifestConfig } from "../ethers/generateManifest";
 
 task("arweave:upload", "Upload site resources to Arweave using official Arweave library")
   .addOptionalParam(
@@ -70,6 +69,9 @@ task("arweave:upload", "Upload site resources to Arweave using official Arweave 
       output,
       uploadManifest,
     } = taskArgs;
+
+    const { uploadToArweave } = await import("../scripts/uploadToArweave");
+    const { loadManifest, saveManifest, generateManifestStandalone } = await import("../ethers/generateManifest");
 
     console.log(`🌐 Arweave Upload Task`);
     console.log(`🌐 Network: ${hre.network.name}\n`);
@@ -164,7 +166,6 @@ task("arweave:upload", "Upload site resources to Arweave using official Arweave 
       const manifestDir = path.dirname(finalManifestPath);
       
       // Save manifest
-      const { saveManifest } = await import("../ethers/generateManifest");
       saveManifest(manifest, finalManifestPath);
 
       console.log(`✅ Manifest generated: ${finalManifestPath}`);
