@@ -313,7 +313,7 @@ export async function uploadDirectory(
         // Recursively handle subdirectories
         // Note: Subdirectories will track their own gas/royalties, but we can't easily aggregate them
         // The summary will be shown at each directory level
-        await uploadDirectory(wttpSite, fullSourcePath, fullDestPath, ignoreOptions, fileLimitBytes, gasLimitGwei);
+        await uploadDirectory(wttpSite, fullSourcePath, fullDestPath, ignoreOptions, fileLimitBytes, gasLimitGwei, customPublisher);
       } else {
         // Upload files
         console.log(`📤 Uploading file: ${item}`);
