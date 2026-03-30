@@ -8,3 +8,4 @@ export * from "./deploy";
 export * from "./generateManifest";
 export * from "./fetchResource";
 export * from "./uploadToArweave";
+export * from "./uploadToIPFS";

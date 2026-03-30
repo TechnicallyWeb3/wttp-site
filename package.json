@@ -1,6 +1,6 @@
 {
   "name": "wttp-site",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "description": "Web3 Transfer Protocol (WTTP) - Site Contracts and deployment tools",
   "main": "./dist/cjs/src/index.js",
   "module": "./dist/esm/src/index.js",
@@ -51,6 +51,8 @@
     "test": "npm run test:setup && npx hardhat test && npm run test:cleanup",
     "test:setup": "npx shx cp -r test-contracts/* contracts/",
     "test:cleanup": "npx shx rm -rf contracts/test",
+    "test:storage": "npx hardhat test test/18-external-storage-unit.test.ts test/19-arweave-integration.test.ts test/20-ipfs-integration.test.ts",
+    "test:storage:unit": "npx hardhat test test/18-external-storage-unit.test.ts",
     "test:compatibility": "cd test-compatibility && node run-all-tests.js",
     "interface:clean": "npx shx rm -rf contracts/interfaces",
     "compile": "npx hardhat compile",
@@ -102,6 +104,7 @@
     "@wttp/core": "^1.0.1",
     "arweave": "^1.15.1",
     "hardhat": "^2.24.2",
+    "pinata": "^2.5.5",
     "vhsm": "^0.2.2"
   }
 }

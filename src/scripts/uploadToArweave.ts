@@ -3,27 +3,62 @@ import path from "path";
 import Arweave from "arweave";
 import type { JWKInterface } from "arweave/node/lib/wallet";
 import { saveManifest, loadManifest } from "./generateManifest";
+import type {
+  IExternalStorageProvider,
+  ExternalStorageUploadOptions,
+  ExternalStorageUploadResult,
+} from "./storageProvider";
 
+/**
+ * Arweave-specific upload options.
+ * Note: `manifestPath` is passed as the first argument to `uploadToArweave()` directly,
+ * not as part of this options object.  Either `walletPath` or `wallet` must be provided.
+ */
 export interface ArweaveUploadOptions {
   /** Path to Arweave wallet JSON file (JWK format) */
   walletPath?: string;
   /** Arweave wallet object (alternative to walletPath) */
   wallet?: any;
-  /** Source directory path (needed to resolve file paths) */
+  /** Root directory used to resolve relative file paths from the manifest */
   sourcePath?: string;
-  /** Whether to upload the manifest itself to Arweave after updating */
+  /** When true, also upload the manifest JSON itself to Arweave */
   uploadManifest?: boolean;
 }
 
-export interface ArweaveUploadResult {
-  /** Number of files uploaded */
-  filesUploaded: number;
-  /** Number of files skipped (already have TXIDs) */
-  filesSkipped: number;
-  /** Map of file paths to Arweave transaction IDs */
+export interface ArweaveUploadResult extends ExternalStorageUploadResult {
+  /** Provider always "arweave" */
+  provider: "arweave";
+  /** Map of manifest-relative file path → Arweave transaction ID (without ar:// prefix) */
   txIds: Map<string, string>;
-  /** Transaction ID of the manifest if uploaded */
+  /** Transaction ID of the manifest if it was uploaded */
   manifestTxId?: string;
+}
+
+/**
+ * ArweaveProvider implements IExternalStorageProvider for use in provider-agnostic
+ * pipelines.  Credentials (wallet) are supplied at construction time.
+ *
+ * @example
+ * ```ts
+ * const provider = new ArweaveProvider({ walletPath: "./arweave-key.json" });
+ * const result = await provider.upload({ manifestPath: "./wttp.manifest.json" });
+ * ```
+ */
+export class ArweaveProvider implements IExternalStorageProvider {
+  readonly providerName = "arweave";
+  private readonly credentials: Pick<ArweaveUploadOptions, "wallet" | "walletPath">;
+
+  constructor(credentials: Pick<ArweaveUploadOptions, "wallet" | "walletPath">) {
+    this.credentials = credentials;
+  }
+
+  async upload(options: ExternalStorageUploadOptions): Promise<ExternalStorageUploadResult> {
+    return uploadToArweave(options.manifestPath, {
+      ...this.credentials,
+      sourcePath: options.sourcePath,
+      uploadManifest: options.uploadManifest,
+    });
+  }
 }
 
 /**
@@ -81,9 +116,11 @@ export async function uploadToArweave(
   if (arweaveFiles.length === 0) {
     console.log(`ℹ️  No files marked for Arweave storage in manifest`);
     return {
+      provider: "arweave",
       filesUploaded: 0,
       filesSkipped: 0,
       txIds: new Map(),
+      fileLocations: new Map(),
     };
   }
 
@@ -218,10 +255,19 @@ export async function uploadToArweave(
     }
   }
 
+  // Build fileLocations map (ar://<txid>) for IExternalStorageProvider compatibility
+  const fileLocations = new Map<string, string>();
+  for (const [filePath, txId] of txIds) {
+    fileLocations.set(filePath, `ar://${txId}`);
+  }
+
   return {
+    provider: "arweave",
     filesUploaded,
     filesSkipped,
     txIds,
+    fileLocations,
     manifestTxId,
+    ...(manifestTxId ? { manifestLocation: `ar://${manifestTxId}` } : {}),
   };
 }

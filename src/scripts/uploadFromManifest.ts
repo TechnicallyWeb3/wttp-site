@@ -174,9 +174,9 @@ export async function uploadFromManifest(
     
     console.log(`\n📄 Processing: ${file.path}`);
     
-    // Handle files with external storage (redirects)
-    if (file.externalStorage === "arweave" && file.redirect) {
-      await uploadArweaveRedirect(
+    // Handle files with external storage (any provider that has set a redirect location)
+    if (file.externalStorage && file.redirect) {
+      await uploadExternalStorageRedirect(
         wttpSite,
         file,
         manifest,
@@ -485,9 +485,12 @@ export async function uploadFromManifest(
 }
 
 /**
- * Upload Arweave redirect using DEFINE
+ * Upload an external storage redirect on-chain using DEFINE.
+ * Works for any storage provider (Arweave, IPFS, Filecoin, etc.) — the only
+ * requirement is that `file.redirect.location` has been resolved by the
+ * corresponding provider (i.e. is not still "[pending]").
  */
-async function uploadArweaveRedirect(
+async function uploadExternalStorageRedirect(
   wttpSite: IBaseWTTPSite,
   file: FileData,
   manifest: Manifest,
@@ -502,9 +505,9 @@ async function uploadArweaveRedirect(
     return;
   }
   
-  // Check if redirect is ready (has TXID)
-  if (file.redirect.location === "ar://[pending]") {
-    console.log(`⏭️  Skipping ${file.path} - Arweave TXID not yet available`);
+  // Check if the provider has resolved the redirect location yet
+  if (file.redirect.location.endsWith("[pending]")) {
+    console.log(`⏭️  Skipping ${file.path} - ${file.externalStorage} location not yet available (still pending)`);
     return;
   }
   

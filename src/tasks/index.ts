@@ -4,6 +4,7 @@ export * from "./fetch";
 export * from "./estimate";
 export * from "./manifest";
 export * from "./arweave";
+export * from "./ipfs";
 
 // WordPress site optimization tasks
 export * from "./wp-minimize";
